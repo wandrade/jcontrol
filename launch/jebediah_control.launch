@@ -23,8 +23,4 @@
     <node name="robot_state_publisher" pkg="robot_state_publisher" type="robot_state_publisher" respawn="false" output="screen">
         <remap from="/joint_states" to="/jebediah/joint_states" />
     </node>
-
-    <!-- load the controller's node-->
-    <node name="controller" pkg="jebediah_control" type="controller.py" respawn="false"
-    output="screen" args=""/>
 </launch>
