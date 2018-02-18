@@ -4,9 +4,19 @@
 
     <!-- load the controllers -->
     <node name="controller_spawner" pkg="controller_manager" type="spawner" respawn="false"
-    output="screen" ns="/jebediah" args="servo_coxa_1_position_controller
-                servo_femur_1_1_position_controller
-                servo_femur_1_2_position_controller
+    output="screen" ns="/jebediah" args="
+                coxa_1_position_controller
+                femur_1_position_controller
+                tibia_1_position_controller
+                coxa_2_position_controller
+                femur_2_position_controller
+                tibia_2_position_controller
+                coxa_3_position_controller
+                femur_3_position_controller
+                tibia_3_position_controller
+                coxa_4_position_controller
+                femur_4_position_controller
+                tibia_4_position_controller
                 joint_state_controller"/>
 
     <!-- convert joint states to Tf transforms for rviz, etc -->
@@ -15,6 +25,6 @@
     </node>
 
     <!-- load the controller's node-->
-    <node name="controller" pkg="jcontrol" type="controller.py" respawn="false"
+    <node name="controller" pkg="jebediah_control" type="controller.py" respawn="false"
     output="screen" args=""/>
 </launch>
