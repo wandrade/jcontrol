@@ -1,5 +1,8 @@
-$ sudo apt-get install ros-kinetic-joint-state-controller : This will install joint_state_controller package
-$ sudo apt-get install ros-kinetic-effort-controllers : This will install Effort controller
-$ sudo apt-get install ros-kinetic-position-controllers : This will install position controllers
-$ sudo apt-get install ros-kinetic-ros-control
-$ sudo apt-get install ros-kinetic-ros-controllers
+sudo apt-get install ros-kinetic-joint-state-controller
+# this will install joint_state_controller package
+sudo apt-get install ros-kinetic-effort-controllers
+# This will install Effort controller
+sudo apt-get install ros-kinetic-position-controllers
+# This will install position controllers
+sudo apt-get install ros-kinetic-ros-control
+sudo apt-get install ros-kinetic-ros-controllers
