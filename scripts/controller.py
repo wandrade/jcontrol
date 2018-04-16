@@ -77,17 +77,21 @@ class jcontroller:
         return self.ground
 
     def setJoints(self, pList):
-        if len(pList) < len(self.servos):
+        
+        if len(pList) < 4:
             rospy.logerr("Position list must be of same length as servos number.")
             return -1
         #fix references angle problems
-        pList[4] = -pList[4]
-        pList[7] = -pList[7]
-        pList[8] = -pList[8]
-        pList[11] = -pList[11]
-        pList = [math.radians(p) for p in pList]
-        for i, controller in enumerate(sorted(self.servos)):
-            self.servos[controller].publish(pList[i])
+        pList[0][1] = -pList[0][1]
+        pList[0][2] = -pList[0][2]
+        pList[3][1] = -pList[3][1]
+        pList[3][2] = -pList[3][2]
+        for i, leg in enumerate(pList):
+            leg = [math.radians(p) for p in leg]
+            
+            self.servos[str('coxa_%d_position_controller' % (i+1))].publish(leg[0])
+            self.servos[str('femur_%d_position_controller' % (i+1))].publish(leg[1])
+            self.servos[str('tibia_%d_position_controller' % (i+1))].publish(leg[2])
 
     def set_initial(self):
         # set to initial position
@@ -105,40 +109,50 @@ class jcontroller:
         for controller in [s for s in self.servos if 'femur' in s]:
             self.servos[controller].publish(0.0)
         rospy.loginfo("Set femur's servos to 0")
-        time.sleep(3)
 
     def set_helloWorld(self):
-        self.setJoints([0.0, -30.0, 0.0, 30.0, 
-                -45.0, -45.0, -45.0, -45.0,
-                45.0, 45.0, 45.0, 45.0])
-        for i in range(-45, 80):
+        self.setJoints([[90.0, 45.0,135.0],
+                        [60.0,45.0,135.0],
+                        [90.0,45.0,135.0],
+                        [120.0,45.0,135.0]])
+        time.sleep(0.1)
+        for i in range(135, 170):
             time.sleep(0.001)
-            self.setJoints([0.0, -30.0, 0.0, 30.0, 
-                        i, -45.0, -45.0, -45.0,
-                        45.0, 45.0, 45.0, 45.0])
+            self.setJoints([[90.0, i,135.0],
+                        [60.0,45.0,135.0],
+                        [90.0,45.0,135.0],
+                        [120.0,45.0,135.0]])
         time.sleep(0.5)
-        for i in range(0, 30):
+        for i in range(90, 120):
             time.sleep(0.001)
-            self.setJoints([i, -30.0, 0.0, 30.0, 
-                        80, -45.0, -45.0, -45.0,
-                        45.0, 45.0, 45.0, 45.0])
+            self.setJoints([[i, 170.0,135.0],
+                        [60.0,45.0,135.0],
+                        [90.0,45.0,135.0],
+                        [120.0,45.0,135.0]])
+        # wave
         for k in range(0, 5):
-            for i in range(30, -30):
+            for i in range(120, 60):
                 time.sleep(0.002)
-                self.setJoints([i, -30.0, 0.0, 30.0, 
-                            80, -45.0, -45.0, -45.0,
-                            45.0, 45.0, 45.0, 45.0])
-            for i in range(-30, 30):
+                self.setJoints([[i, 170.0,135.0],
+                        [60.0,45.0,135.0],
+                        [90.0,45.0,135.0],
+                        [120.0,45.0,135.0]])
+            for i in range(60, 120):
                 time.sleep(0.002)
-                self.setJoints([i, -30.0, 0.0, 30.0, 
-                            80, -45.0, -45.0, -45.0,
-                            45.0, 45.0, 45.0, 45.0])
+                self.setJoints([[i, 170.0,135.0],
+                        [60.0,45.0,135.0],
+                        [90.0,45.0,135.0],
+                        [120.0,45.0,135.0]])
 
 if __name__ == '__main__':
     try:
         j = jcontroller()
-        j.reset()
         j.set_initial()
-        j.set_helloWorld()
+        j.reset()
+        j.setJoints([[40.0, 40.0, 40.0],
+                        [40.0, 40.0, 40.0],
+                        [40.0, 40.0, 40.0],
+                        [40.0, 40.0, 40.0]])
+        #j.set_helloWorld()
     except rospy.ROSInterruptException:
         pass
