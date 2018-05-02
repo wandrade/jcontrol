@@ -9,7 +9,7 @@ from collections import OrderedDict
 
 from std_msgs.msg import Float64
 from std_srvs.srv import Empty
-from gazebo_msgs.msg import ContactState, ContactsState
+from gazebo_msgs.msg import ContactState, ContactsState, ModelStates
 
 class jcontroller:
     # Controllers names
@@ -27,7 +27,7 @@ class jcontroller:
             "tibia_4_position_controller":None}
     ground = [False, False, False, False]
     selfCollide = [False, False, False, False]
-    
+    state = ''
     def __init__(self):
         rospy.init_node('jebediah_controler')
         # Create reset service
@@ -43,6 +43,8 @@ class jcontroller:
         rospy.Subscriber("jebediah/tibia_2_conctact_sensor", ContactsState, self.callback_tibia_sensor)
         rospy.Subscriber("jebediah/tibia_3_conctact_sensor", ContactsState, self.callback_tibia_sensor)
         rospy.Subscriber("jebediah/tibia_4_conctact_sensor", ContactsState, self.callback_tibia_sensor)
+        # State topic
+        rospy.Subscriber("gazebo/model_states", ModelStates, self.callback_body_state)
         rospy.loginfo("Controller API loaded")
 
     def callback_tibia_sensor(self, data):
@@ -62,6 +64,9 @@ class jcontroller:
         self.ground[tibia] = bool(flag_ground)
         self.selfCollide[tibia] = bool(flag_self)
 
+    def callback_body_state(self, states):
+        self.state = states.pose[1]
+
     def reset(self):
         self.resetService = rospy.ServiceProxy('gazebo/reset_simulation', Empty)
         try:
@@ -75,6 +80,9 @@ class jcontroller:
     
     def get_ground(self):
         return self.ground
+
+    def get_state(self):
+        return self.state
 
     def setJoints(self, pList):
         
@@ -153,6 +161,6 @@ if __name__ == '__main__':
                         [40.0, 40.0, 40.0],
                         [40.0, 40.0, 40.0],
                         [40.0, 40.0, 40.0]])
-        #j.set_helloWorld()
+        j.set_helloWorld()
     except rospy.ROSInterruptException:
         pass
