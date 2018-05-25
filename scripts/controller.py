@@ -9,7 +9,7 @@ from collections import OrderedDict
 
 from std_msgs.msg import Float64
 from std_srvs.srv import Empty
-from gazebo_msgs.msg import ContactState, ContactsState, ModelStates
+from gazebo_msgs.msg import ContactState, ContactsState, ModelStates, LinkStates
 
 class jcontroller:
     # Controllers names
@@ -28,6 +28,7 @@ class jcontroller:
     ground = [False, False, False, False]
     selfCollide = [False, False, False, False]
     state = ''
+
     def __init__(self):
         rospy.init_node('jebediah_controler')
         # Create reset service
@@ -35,7 +36,7 @@ class jcontroller:
         rospy.wait_for_service('gazebo/reset_simulation')
         # Create publisher to all topics
         for c in self.servos:
-            topicName = "jebediah/"+c+"/command"
+            topicName = "jebediah/" + c + "/command"
             self.servos[c] = rospy.Publisher(topicName,Float64, latch=True, queue_size=1)
         rospy.loginfo("Created publishers")
         # Subscribe to sensor topics
@@ -43,10 +44,18 @@ class jcontroller:
         rospy.Subscriber("jebediah/tibia_2_conctact_sensor", ContactsState, self.callback_tibia_sensor)
         rospy.Subscriber("jebediah/tibia_3_conctact_sensor", ContactsState, self.callback_tibia_sensor)
         rospy.Subscriber("jebediah/tibia_4_conctact_sensor", ContactsState, self.callback_tibia_sensor)
-        # State topic
+
+        # Model state
         rospy.Subscriber("gazebo/model_states", ModelStates, self.callback_body_state)
+        # Link angles
+        rospy.Subscriber("gazebo/link_states", LinkStates, self.callback_link_states)
+        
         rospy.loginfo("Controller API loaded")
 
+    def callback_link_states(self, links):
+        #print links
+        #print '-'*10
+        pass
     def callback_tibia_sensor(self, data):
         # identify wich tibia called
         tibia = data.header.frame_id
@@ -65,7 +74,7 @@ class jcontroller:
         self.selfCollide[tibia] = bool(flag_self)
 
     def callback_body_state(self, states):
-        self.state = states.pose[1]
+        self.states = states.pose[1]
 
     def reset(self):
         self.resetService = rospy.ServiceProxy('gazebo/reset_simulation', Empty)
@@ -119,38 +128,38 @@ class jcontroller:
         rospy.loginfo("Set femur's servos to 0")
 
     def set_helloWorld(self):
-        self.setJoints([[90.0, 45.0,135.0],
-                        [60.0,45.0,135.0],
-                        [90.0,45.0,135.0],
-                        [120.0,45.0,135.0]])
+        self.setJoints([[   0.0,    -45.0,  45.0],
+                        [ -30.0,    -45.0,  45.0],
+                        [   0.0,    -45.0,  45.0],
+                        [  30.0,    -45.0,  45.0]])
         time.sleep(0.1)
-        for i in range(135, 170):
+        for i in range(-45, 80):
             time.sleep(0.001)
-            self.setJoints([[90.0, i,135.0],
-                        [60.0,45.0,135.0],
-                        [90.0,45.0,135.0],
-                        [120.0,45.0,135.0]])
+            self.setJoints([[0.0, i, 45.0],
+                        [-30.0,-45.0,45.0],
+                        [0.0,-45.0,45.0],
+                        [30.0,-45.0,45.0]])
         time.sleep(0.5)
-        for i in range(90, 120):
+        for i in range(0, 30):
             time.sleep(0.001)
-            self.setJoints([[i, 170.0,135.0],
-                        [60.0,45.0,135.0],
-                        [90.0,45.0,135.0],
-                        [120.0,45.0,135.0]])
+            self.setJoints([[i, 80.0,45.0],
+                        [-30.0,-45.0,45.0],
+                        [0.0,-45.0,45.0],
+                        [30.0,-45.0,45.0]])
         # wave
         for k in range(0, 5):
-            for i in range(120, 60):
+            for i in range(30, -30):
                 time.sleep(0.002)
-                self.setJoints([[i, 170.0,135.0],
-                        [60.0,45.0,135.0],
-                        [90.0,45.0,135.0],
-                        [120.0,45.0,135.0]])
-            for i in range(60, 120):
+                self.setJoints([[i, 80.0,45.0],
+                        [-30.0,-45.0,45.0],
+                        [0.0,-45.0,45.0],
+                        [30.0,-45.0,45.0]])
+            for i in range(-30, 30):
                 time.sleep(0.002)
-                self.setJoints([[i, 170.0,135.0],
-                        [60.0,45.0,135.0],
-                        [90.0,45.0,135.0],
-                        [120.0,45.0,135.0]])
+                self.setJoints([[i, 80.0,45.0],
+                        [-30.0,-45.0,45.0],
+                        [0.0,-45.0,45.0],
+                        [30.0,-45.0,45.0]])
 
 if __name__ == '__main__':
     try:
