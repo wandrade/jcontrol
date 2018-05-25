@@ -9,8 +9,8 @@ from collections import OrderedDict
 
 from std_msgs.msg import Float64
 from std_srvs.srv import Empty
-from gazebo_msgs.msg import ContactState, ContactsState, ModelStates, LinkStates
-
+from gazebo_msgs.msg import ContactState, ContactsState, ModelStates
+from control_msgs.msg import JointControllerState
 class jcontroller:
     # Controllers names
     servos = {"coxa_1_position_controller":None,
@@ -21,14 +21,21 @@ class jcontroller:
             "tibia_2_position_controller":None,
             "coxa_3_position_controller":None,
             "femur_3_position_controller":None,
-            "tibia_3_position_controller":None,
+            "tibia_3_position_controller":None, 
             "coxa_4_position_controller":None,
             "femur_4_position_controller":None,
             "tibia_4_position_controller":None}
+    # Sensors
     ground = [False, False, False, False]
     selfCollide = [False, False, False, False]
+    angles = [  [0, 0, 0],
+                [0, 0, 0],
+                [0, 0, 0],
+                [0, 0, 0]]
     state = ''
-
+    # Joints sensor noise
+    mu = 0
+    sigma = 0.01
     def __init__(self):
         rospy.init_node('jebediah_controler')
         # Create reset service
@@ -48,14 +55,52 @@ class jcontroller:
         # Model state
         rospy.Subscriber("gazebo/model_states", ModelStates, self.callback_body_state)
         # Link angles
-        rospy.Subscriber("gazebo/link_states", LinkStates, self.callback_link_states)
+        rospy.Subscriber("/jebediah/coxa_1_position_controller/state", JointControllerState, self.callback_joint_state_00)
+        rospy.Subscriber("/jebediah/coxa_2_position_controller/state", JointControllerState, self.callback_joint_state_10)
+        rospy.Subscriber("/jebediah/coxa_3_position_controller/state", JointControllerState, self.callback_joint_state_20)
+        rospy.Subscriber("/jebediah/coxa_4_position_controller/state", JointControllerState, self.callback_joint_state_30)
+        rospy.Subscriber("/jebediah/femur_1_position_controller/state", JointControllerState, self.callback_joint_state_01)
+        rospy.Subscriber("/jebediah/femur_2_position_controller/state", JointControllerState, self.callback_joint_state_11)
+        rospy.Subscriber("/jebediah/femur_3_position_controller/state", JointControllerState, self.callback_joint_state_21)
+        rospy.Subscriber("/jebediah/femur_4_position_controller/state", JointControllerState, self.callback_joint_state_31)
+        rospy.Subscriber("/jebediah/tibia_1_position_controller/state", JointControllerState, self.callback_joint_state_02)
+        rospy.Subscriber("/jebediah/tibia_2_position_controller/state", JointControllerState, self.callback_joint_state_12)
+        rospy.Subscriber("/jebediah/tibia_3_position_controller/state", JointControllerState, self.callback_joint_state_22)
+        rospy.Subscriber("/jebediah/tibia_4_position_controller/state", JointControllerState, self.callback_joint_state_32)
         
         rospy.loginfo("Controller API loaded")
 
-    def callback_link_states(self, links):
-        #print links
-        #print '-'*10
-        pass
+#   def callback_joint_state_lj(self, joint):
+    # LEG 1
+    def callback_joint_state_00(self, joint):
+        self.angles[0][0] = joint.process_value + np.random.normal(self.mu, self.sigma)
+    def callback_joint_state_01(self, joint):
+        self.angles[0][1] = -1*joint.process_value + np.random.normal(self.mu, self.sigma)
+    def callback_joint_state_02(self, joint):
+        self.angles[0][2] = joint.process_value + np.random.normal(self.mu, self.sigma)
+    # LEG 2
+    def callback_joint_state_10(self, joint):
+        self.angles[1][0] = joint.process_value + np.random.normal(self.mu, self.sigma)
+    def callback_joint_state_11(self, joint):
+        self.angles[1][1] = joint.process_value + np.random.normal(self.mu, self.sigma)
+    def callback_joint_state_12(self, joint):
+        self.angles[1][2] = joint.process_value + np.random.normal(self.mu, self.sigma)
+    # LEG 3
+    def callback_joint_state_20(self, joint):
+        self.angles[2][0] = joint.process_value + np.random.normal(self.mu, self.sigma)
+    def callback_joint_state_21(self, joint):
+        self.angles[2][1] = joint.process_value + np.random.normal(self.mu, self.sigma)
+    def callback_joint_state_22(self, joint):
+        self.angles[2][2] = joint.process_value + np.random.normal(self.mu, self.sigma)
+    # LEG 4
+    def callback_joint_state_30(self, joint):
+        self.angles[3][0] = joint.process_value + np.random.normal(self.mu, self.sigma)
+    def callback_joint_state_31(self, joint):
+        self.angles[3][1] = -1*joint.process_value + np.random.normal(self.mu, self.sigma)
+    def callback_joint_state_32(self, joint):
+        self.angles[3][2] = joint.process_value + np.random.normal(self.mu, self.sigma)
+#       self.angles[l][j] = joint.process_value + np.random.normal(self.mu, self.sigma)
+
     def callback_tibia_sensor(self, data):
         # identify wich tibia called
         tibia = data.header.frame_id
@@ -74,7 +119,7 @@ class jcontroller:
         self.selfCollide[tibia] = bool(flag_self)
 
     def callback_body_state(self, states):
-        self.states = states.pose[1]
+        self.state = states.pose[1]
 
     def reset(self):
         self.resetService = rospy.ServiceProxy('gazebo/reset_simulation', Empty)
@@ -93,7 +138,10 @@ class jcontroller:
     def get_state(self):
         return self.state
 
-    def setJoints(self, pList):
+    def get_joints(self):
+        return self.angles
+
+    def set_joints(self, pList):
         
         if len(pList) < 4:
             rospy.logerr("Position list must be of same length as servos number.")
@@ -128,21 +176,21 @@ class jcontroller:
         rospy.loginfo("Set femur's servos to 0")
 
     def set_helloWorld(self):
-        self.setJoints([[   0.0,    -45.0,  45.0],
+        self.set_joints([[   0.0,    -45.0,  45.0],
                         [ -30.0,    -45.0,  45.0],
                         [   0.0,    -45.0,  45.0],
                         [  30.0,    -45.0,  45.0]])
         time.sleep(0.1)
         for i in range(-45, 80):
             time.sleep(0.001)
-            self.setJoints([[0.0, i, 45.0],
+            self.set_joints([[0.0, i, 45.0],
                         [-30.0,-45.0,45.0],
                         [0.0,-45.0,45.0],
                         [30.0,-45.0,45.0]])
         time.sleep(0.5)
         for i in range(0, 30):
             time.sleep(0.001)
-            self.setJoints([[i, 80.0,45.0],
+            self.set_joints([[i, 80.0,45.0],
                         [-30.0,-45.0,45.0],
                         [0.0,-45.0,45.0],
                         [30.0,-45.0,45.0]])
@@ -150,13 +198,13 @@ class jcontroller:
         for k in range(0, 5):
             for i in range(30, -30):
                 time.sleep(0.002)
-                self.setJoints([[i, 80.0,45.0],
+                self.set_joints([[i, 80.0,45.0],
                         [-30.0,-45.0,45.0],
                         [0.0,-45.0,45.0],
                         [30.0,-45.0,45.0]])
             for i in range(-30, 30):
                 time.sleep(0.002)
-                self.setJoints([[i, 80.0,45.0],
+                self.set_joints([[i, 80.0,45.0],
                         [-30.0,-45.0,45.0],
                         [0.0,-45.0,45.0],
                         [30.0,-45.0,45.0]])
@@ -166,10 +214,15 @@ if __name__ == '__main__':
         j = jcontroller()
         j.set_initial()
         j.reset()
-        j.setJoints([[40.0, 40.0, 40.0],
+        j.set_helloWorld()
+        j.set_joints([[40.0, 40.0, 40.0],
                         [40.0, 40.0, 40.0],
                         [40.0, 40.0, 40.0],
                         [40.0, 40.0, 40.0]])
-        j.set_helloWorld()
+        while True:
+            for leg in j.get_joints():
+                print leg
+            print '='*50
+            time.sleep(1)
     except rospy.ROSInterruptException:
         pass
