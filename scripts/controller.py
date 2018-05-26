@@ -4,7 +4,7 @@ import rospy
 import time
 import math
 import re
-
+import numpy as np
 from collections import OrderedDict
 
 from std_msgs.msg import Float64
@@ -35,7 +35,7 @@ class jcontroller:
     state = ''
     # Joints sensor noise
     mu = 0
-    sigma = 0.01
+    sigma = 0.005
     def __init__(self):
         rospy.init_node('jebediah_controler')
         # Create reset service
@@ -77,7 +77,7 @@ class jcontroller:
     def callback_joint_state_01(self, joint):
         self.angles[0][1] = -1*joint.process_value + np.random.normal(self.mu, self.sigma)
     def callback_joint_state_02(self, joint):
-        self.angles[0][2] = joint.process_value + np.random.normal(self.mu, self.sigma)
+        self.angles[0][2] = -1*joint.process_value + np.random.normal(self.mu, self.sigma)
     # LEG 2
     def callback_joint_state_10(self, joint):
         self.angles[1][0] = joint.process_value + np.random.normal(self.mu, self.sigma)
@@ -98,7 +98,7 @@ class jcontroller:
     def callback_joint_state_31(self, joint):
         self.angles[3][1] = -1*joint.process_value + np.random.normal(self.mu, self.sigma)
     def callback_joint_state_32(self, joint):
-        self.angles[3][2] = joint.process_value + np.random.normal(self.mu, self.sigma)
+        self.angles[3][2] = -1*joint.process_value + np.random.normal(self.mu, self.sigma)
 #       self.angles[l][j] = joint.process_value + np.random.normal(self.mu, self.sigma)
 
     def callback_tibia_sensor(self, data):
@@ -139,7 +139,10 @@ class jcontroller:
         return self.state
 
     def get_joints(self):
-        return self.angles
+        degree = []
+        for leg in self.angles:
+            degree.append([math.degrees(j) for j in leg])
+        return degree
 
     def set_joints(self, pList):
         
