@@ -5,12 +5,16 @@ import time
 import math
 import re
 import numpy as np
-from collections import OrderedDict
+import threading
 
+from collections import OrderedDict
 from std_msgs.msg import Float64
 from std_srvs.srv import Empty
 from gazebo_msgs.msg import ContactState, ContactsState, ModelStates
 from control_msgs.msg import JointControllerState
+from sensor_msgs.msg import Imu
+
+
 class jcontroller:
     # Controllers names
     servos = {"coxa_1_position_controller":None,
@@ -32,16 +36,21 @@ class jcontroller:
                 [0, 0, 0],
                 [0, 0, 0],
                 [0, 0, 0]]
-    state = ''
+    body = ''
+    IMU = None
+    lin_vel = [0, 0]
+    ang_vel = [0, 0]
     # Joints sensor noise
     mu = 0
     sigma = 0.005
+    # speed timer
+    interval = 0.015
     def __init__(self):
         rospy.init_node('jebediah_controler')
         # Create reset service
         rospy.loginfo("Waiting for gazebo services")
         rospy.wait_for_service('gazebo/reset_simulation')
-        # Create publisher to all topics
+        # Create publisher for all topics
         for c in self.servos:
             topicName = "jebediah/" + c + "/command"
             self.servos[c] = rospy.Publisher(topicName,Float64, latch=True, queue_size=1)
@@ -67,8 +76,21 @@ class jcontroller:
         rospy.Subscriber("/jebediah/tibia_2_position_controller/state", JointControllerState, self.callback_joint_state_12)
         rospy.Subscriber("/jebediah/tibia_3_position_controller/state", JointControllerState, self.callback_joint_state_22)
         rospy.Subscriber("/jebediah/tibia_4_position_controller/state", JointControllerState, self.callback_joint_state_32)
-        
+        # IMU
+        rospy.Subscriber("/jebediah/imu_data", Imu, self.callback_IMU)
+        rospy.loginfo("Waiting for IMU data")
+        while(self.IMU is None):
+            pass
+        threading.Timer(self.interval, self.vel_calc).start()
         rospy.loginfo("Controller API loaded")
+    
+    def vel_calc(self):
+        self.lin_vel[0] = self.lin_vel[0] + self.IMU.linear_acceleration.x*self.interval;
+        self.lin_vel[1] = self.lin_vel[1] + self.IMU.linear_acceleration.y*self.interval;
+        threading.Timer(1, self.vel_calc).start()
+
+    def callback_IMU(self, data):
+        self.IMU = data
 
 #   def callback_joint_state_lj(self, joint):
     # LEG 1
@@ -119,7 +141,7 @@ class jcontroller:
         self.selfCollide[tibia] = bool(flag_self)
 
     def callback_body_state(self, states):
-        self.state = states.pose[1]
+        self.body = states.pose[1]
 
     def reset(self):
         self.resetService = rospy.ServiceProxy('gazebo/reset_simulation', Empty)
@@ -135,14 +157,17 @@ class jcontroller:
     def get_ground(self):
         return self.ground
 
-    def get_state(self):
-        return self.state
+    def get_body_state(self):
+        return self.body
 
     def get_joints(self):
         degree = []
         for leg in self.angles:
             degree.append([math.degrees(j) for j in leg])
         return degree
+
+    def get_velocity(self):
+        return self.lin_vel, self.IMU.angular_velocity.z
 
     def set_joints(self, pList):
         
@@ -218,14 +243,12 @@ if __name__ == '__main__':
         j.set_initial()
         j.reset()
         j.set_helloWorld()
-        j.set_joints([[40.0, 40.0, 40.0],
+        j.set_joints([[-45.0, 40.0, 40.0],
                         [40.0, 40.0, 40.0],
                         [40.0, 40.0, 40.0],
                         [40.0, 40.0, 40.0]])
         while True:
-            for leg in j.get_joints():
-                print leg
-            print '='*50
             time.sleep(1)
+            print j.get_velocity()
     except rospy.ROSInterruptException:
         pass
