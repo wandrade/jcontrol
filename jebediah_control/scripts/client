@@ -1,6 +1,10 @@
 #!/usr/bin/env bash
-export ROS_IP=0.0.0.0
-export ROS_MASTER_URI='http://192.168.0.40:11311'
+sv=$1
+hn=$(ifconfig | grep -Eo 'inet (addr:)?([0-9]*\.){3}[0-9]*' | grep -Eo '([0-9]*\.){3}[0-9]*' | grep -v '127.0.0.1' | grep -v 172*)
+echo "Client $hn connecting to server $sv"
+export ROS_IP=$hn
+export ROS_HOSTNAME=$hn
+export ROS_MASTER_URI="http://$sv:11311"
 rosrun jebediah_control controller
 
 
