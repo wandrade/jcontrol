@@ -243,7 +243,7 @@ if __name__ == '__main__':
         j.set_initial()
         j.reset()
         j.set_helloWorld()
-        j.set_joints([[-45.0, 40.0, 40.0],
+        j.set_joints([[-90.0, 40.0, 40.0],
                         [40.0, 40.0, 40.0],
                         [40.0, 40.0, 40.0],
                         [40.0, 40.0, 40.0]])
