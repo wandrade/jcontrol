@@ -1,0 +1,10 @@
+#!/usr/bin/env bash
+
+export ROS_HOSTNAME=192.168.0.40
+export ROS_MASTER_URI="http://192.168.0.40:11311"
+export LIBGL_ALWAYS_SOFTWARE=1
+export GAZEBO_IP=192.168.0.40
+export GAZEBO_MASTER_URI=192.168.0.40
+
+
+roslaunch jebediah_control server_headless.launch
