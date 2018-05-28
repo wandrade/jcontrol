@@ -5,7 +5,8 @@
 #include <gazebo_msgs/ContactsState.h>
 #include <sensor_msgs/Imu.h>
 #include <std_msgs/Float64.h>
-
+#include <gazebo_msgs/ModelStates.h>
+#include <geometry_msgs/Point.h>
 #include <iostream>
 #include <random>
 using namespace std;
@@ -24,18 +25,19 @@ class controller {
     float angles[12];
     bool ground[4];
     bool selfCollide[4];
-    double lin_vel[2] = {0,0};
     double ang_vel;
-    double interval = 1.0/pubhz;
-    float orientation[4];
     // Joint position subscribers: joint_leg/joint
     ros::Subscriber joint_00, joint_10 , joint_20 , joint_30;
     ros::Subscriber joint_01, joint_11 , joint_21 , joint_31;
     ros::Subscriber joint_02, joint_12 , joint_22 , joint_32;
+    // Robot position
+    ros::Subscriber position_sub;
+    geometry_msgs::Point position;
     // Toouch sensor topic
     ros::Subscriber touch_sensor_1, touch_sensor_2, touch_sensor_3, touch_sensor_4;
     // IMU
     ros::Subscriber IMU;
+    sensor_msgs::Imu imu;
     // Action
     ros::Subscriber action_sub;
     ros::Publisher action_pub[12];
@@ -109,13 +111,10 @@ class controller {
       selfCollide[tibia-1] = self;
     }
   void IMU_callback(const sensor_msgs::Imu::ConstPtr& data){
-    lin_vel[0] += data->linear_acceleration.x*interval;
-    lin_vel[1] += data->linear_acceleration.y*interval;
-    ang_vel = data->angular_velocity.z;
-    orientation[0] = data->orientation.x;
-    orientation[1] = data->orientation.y;
-    orientation[2] = data->orientation.z;
-    orientation[3] = data->orientation.w;
+    imu = *data;
+  }
+  void position_callback(const gazebo_msgs::ModelStates::ConstPtr& model_state){
+    position = model_state->pose[1].position;
   }
   void action_callback(const jcontrol_msgs::Action::ConstPtr& act){
     int j = 1;
@@ -167,6 +166,8 @@ class controller {
       joint_12 = n.subscribe("/jebediah/tibia_2_position_controller/state", 1, &controller::joint_callback_12, this);
       joint_22 = n.subscribe("/jebediah/tibia_3_position_controller/state", 1, &controller::joint_callback_22, this);
       joint_32 = n.subscribe("/jebediah/tibia_4_position_controller/state", 1, &controller::joint_callback_32, this);
+      // Position sensor
+      position_sub = n.subscribe("gazebo/model_states", 1, &controller::position_callback, this);
       // Touch sensor
       touch_sensor_1 = n.subscribe("/jebediah/tibia_1_conctact_sensor", 1, &controller::touch_callback, this);
       touch_sensor_2 = n.subscribe("/jebediah/tibia_2_conctact_sensor", 1, &controller::touch_callback, this);
@@ -198,13 +199,8 @@ class controller {
           state.Self_Collision[i] = selfCollide[i];
           state.Ground_Collision[i] = ground[i];
         }
-        state.Linear_Vel_Vector[0] = lin_vel[0];
-        state.Linear_Vel_Vector[1] = lin_vel[1];
-        state.Angular_Velocity = ang_vel;
-        state.Orientation.x = orientation[0];
-        state.Orientation.y = orientation[1];
-        state.Orientation.z = orientation[2];
-        state.Orientation.w = orientation[3];
+        state.IMU = imu;
+        state.Position = position;
         pub.publish(state);
         ros::spinOnce();
         loop_rate.sleep();

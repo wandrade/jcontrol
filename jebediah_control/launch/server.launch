@@ -26,4 +26,5 @@
     <node name="robot_state_publisher" pkg="robot_state_publisher" type="robot_state_publisher" respawn="false" output="screen">
         <remap from="/joint_states" to="/jebediah/joint_states" />
     </node>
+    <node name="ctrl_api" pkg="jebediah_control" type="ctrl_api" respawn="true" output="screen"></node>
 </launch>
