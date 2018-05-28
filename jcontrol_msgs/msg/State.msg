@@ -3,3 +3,4 @@ int8[4] Ground_Collision
 int8[4] Self_Collision
 sensor_msgs/Imu IMU
 geometry_msgs/Point Position
+geometry_msgs/Twist Twist

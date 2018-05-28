@@ -7,6 +7,7 @@
 #include <std_msgs/Float64.h>
 #include <gazebo_msgs/ModelStates.h>
 #include <geometry_msgs/Point.h>
+#include <geometry_msgs/Twist.h>
 #include <iostream>
 #include <random>
 using namespace std;
@@ -33,6 +34,7 @@ class controller {
     // Robot position
     ros::Subscriber position_sub;
     geometry_msgs::Point position;
+    geometry_msgs::Twist twist;
     // Toouch sensor topic
     ros::Subscriber touch_sensor_1, touch_sensor_2, touch_sensor_3, touch_sensor_4;
     // IMU
@@ -115,6 +117,7 @@ class controller {
   }
   void position_callback(const gazebo_msgs::ModelStates::ConstPtr& model_state){
     position = model_state->pose[1].position;
+    twist = model_state->twist[1];
   }
   void action_callback(const jcontrol_msgs::Action::ConstPtr& act){
     int j = 1;
@@ -201,6 +204,7 @@ class controller {
         }
         state.IMU = imu;
         state.Position = position;
+        state.Twist = twist;
         pub.publish(state);
         ros::spinOnce();
         loop_rate.sleep();
