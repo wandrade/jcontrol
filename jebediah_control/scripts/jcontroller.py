@@ -15,7 +15,7 @@ class jcontroller:
         rospy.wait_for_service('gazebo/reset_simulation')
         self.action_publisher = rospy.Publisher("/jebediah/Action", Action, latch=True, queue_size=1)
         rospy.Subscriber("/jebediah/State", State, self.state_callback)
-        
+        rospy.loginfo("Done..")
     def reset(self):
         self.resetService = rospy.ServiceProxy('gazebo/reset_simulation', Empty)
         try:
