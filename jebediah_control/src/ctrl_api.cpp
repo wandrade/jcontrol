@@ -49,11 +49,11 @@ class controller {
     }
     void joint_callback_01(const control_msgs::JointControllerState::ConstPtr& joint){
       std::normal_distribution<double> distribution(U,P);
-      angles[1] = joint->process_value + distribution(generator);
+      angles[1] = -1*joint->process_value + distribution(generator);
     }
     void joint_callback_02(const control_msgs::JointControllerState::ConstPtr& joint){
       std::normal_distribution<double> distribution(U,P);
-      angles[2] = joint->process_value + distribution(generator);
+      angles[2] = -1*joint->process_value + distribution(generator);
     }
     void joint_callback_10(const control_msgs::JointControllerState::ConstPtr& joint){
       std::normal_distribution<double> distribution(U,P);
@@ -85,11 +85,11 @@ class controller {
     }
     void joint_callback_31(const control_msgs::JointControllerState::ConstPtr& joint){
       std::normal_distribution<double> distribution(U,P);
-      angles[10] = joint->process_value + distribution(generator);
+      angles[10] = -1*joint->process_value + distribution(generator);
     }
     void joint_callback_32(const control_msgs::JointControllerState::ConstPtr& joint){
       std::normal_distribution<double> distribution(U,P);
-      angles[11] = joint->process_value + distribution(generator);
+      angles[11] = -1*joint->process_value + distribution(generator);
     }
     void touch_callback(const gazebo_msgs::ContactsState::ConstPtr& contact){
       int tibia = int(contact->header.frame_id[6]) - 48;
