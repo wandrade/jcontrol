@@ -10,6 +10,7 @@
 #include <geometry_msgs/Twist.h>
 #include <iostream>
 #include <random>
+#include <tf/tf.h>
 using namespace std;
 
 class controller {
@@ -31,11 +32,11 @@ class controller {
     ros::Subscriber joint_00, joint_10 , joint_20 , joint_30;
     ros::Subscriber joint_01, joint_11 , joint_21 , joint_31;
     ros::Subscriber joint_02, joint_12 , joint_22 , joint_32;
-    // Robot position
+    // Robot position and velocity
     ros::Subscriber odom_sub;
     geometry_msgs::Point position;
     geometry_msgs::Twist twist;
-    // Toouch sensor topic
+    // Touch sensor topic
     ros::Subscriber touch_sensor_1, touch_sensor_2, touch_sensor_3, touch_sensor_4;
     // IMU
     ros::Subscriber IMU;
@@ -44,6 +45,7 @@ class controller {
     ros::Subscriber action_sub;
     ros::Publisher action_pub[12];
     std_msgs::Float64 action_val;
+
   // FUNCTIONS
     // State publisher
     ros::Publisher pub;
@@ -117,7 +119,22 @@ class controller {
   }
   void odom_callback(const nav_msgs::Odometry::ConstPtr& odom){
     position = odom->pose.pose.position;
-    twist = odom->twist.twist;
+    // Twist commes relative to the world frame, we need to rotate it só da it is represented with reference to the robot frame
+    // To do that using the quaternion provided by it's pose 
+    // v' = q*v*q'
+    // where v' is the rotated vector, q is the quaternion
+
+    // geo_msg/quat to geo_msg/quatStamped
+    
+    // tf::Quaternion quat(odom->pose.pose.orientation.x, odom->pose.pose.orientation.y, odom->pose.pose.orientation.z, odom->pose.pose.orientation.w);
+    tf::Quaternion quat(imu.orientation.x, imu.orientation.y, imu.orientation.z, imu.orientation.w);
+    // tf::Quaternion quat = tf::createQuaternionFromYaw (3.14); 
+    tf::Vector3 vect(odom->twist.twist.linear.x,odom->twist.twist.linear.y,odom->twist.twist.linear.z);
+    tf::Vector3 rot_vect = tf::quatRotate(quat, vect);
+    
+    twist.linear.x = rot_vect.getX();
+    twist.linear.y = rot_vect.getY();
+    twist.linear.z = rot_vect.getZ();
   }
   void action_callback(const jcontrol_msgs::Action::ConstPtr& act){
     int j = 1;
