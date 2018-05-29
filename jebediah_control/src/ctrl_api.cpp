@@ -170,7 +170,7 @@ class controller {
       joint_22 = n.subscribe("/jebediah/tibia_3_position_controller/state", 1, &controller::joint_callback_22, this);
       joint_32 = n.subscribe("/jebediah/tibia_4_position_controller/state", 1, &controller::joint_callback_32, this);
       // Odometry
-      odom_sub = n.subscribe("gazebo/model_states", 1, &controller::odom_callback, this);
+      odom_sub = n.subscribe("/jebediah/Odom", 1, &controller::odom_callback, this);
       // Touch sensor
       touch_sensor_1 = n.subscribe("/jebediah/tibia_1_conctact_sensor", 1, &controller::touch_callback, this);
       touch_sensor_2 = n.subscribe("/jebediah/tibia_2_conctact_sensor", 1, &controller::touch_callback, this);
