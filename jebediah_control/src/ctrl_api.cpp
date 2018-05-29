@@ -5,7 +5,7 @@
 #include <gazebo_msgs/ContactsState.h>
 #include <sensor_msgs/Imu.h>
 #include <std_msgs/Float64.h>
-#include <gazebo_msgs/ModelStates.h>
+#include <nav_msgs/Odometry.h>
 #include <geometry_msgs/Point.h>
 #include <geometry_msgs/Twist.h>
 #include <iostream>
@@ -32,7 +32,7 @@ class controller {
     ros::Subscriber joint_01, joint_11 , joint_21 , joint_31;
     ros::Subscriber joint_02, joint_12 , joint_22 , joint_32;
     // Robot position
-    ros::Subscriber position_sub;
+    ros::Subscriber odom_sub;
     geometry_msgs::Point position;
     geometry_msgs::Twist twist;
     // Toouch sensor topic
@@ -115,9 +115,9 @@ class controller {
   void IMU_callback(const sensor_msgs::Imu::ConstPtr& data){
     imu = *data;
   }
-  void position_callback(const gazebo_msgs::ModelStates::ConstPtr& model_state){
-    position = model_state->pose[1].position;
-    twist = model_state->twist[1];
+  void odom_callback(const nav_msgs::Odometry::ConstPtr& odom){
+    position = odom->pose.pose.position;
+    twist = odom->twist.twist;
   }
   void action_callback(const jcontrol_msgs::Action::ConstPtr& act){
     int j = 1;
@@ -169,8 +169,8 @@ class controller {
       joint_12 = n.subscribe("/jebediah/tibia_2_position_controller/state", 1, &controller::joint_callback_12, this);
       joint_22 = n.subscribe("/jebediah/tibia_3_position_controller/state", 1, &controller::joint_callback_22, this);
       joint_32 = n.subscribe("/jebediah/tibia_4_position_controller/state", 1, &controller::joint_callback_32, this);
-      // Position sensor
-      position_sub = n.subscribe("gazebo/model_states", 1, &controller::position_callback, this);
+      // Odometry
+      odom_sub = n.subscribe("gazebo/model_states", 1, &controller::odom_callback, this);
       // Touch sensor
       touch_sensor_1 = n.subscribe("/jebediah/tibia_1_conctact_sensor", 1, &controller::touch_callback, this);
       touch_sensor_2 = n.subscribe("/jebediah/tibia_2_conctact_sensor", 1, &controller::touch_callback, this);
