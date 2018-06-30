@@ -20,7 +20,7 @@ def joinLists(a, b, steps = 30):
     loa = [] # list of actuators
     ini = a[-1]
     end = b[0]
-    for i in range (4): # for each leg
+    for i in range (1): # for each leg
         for j in range(3): # for each motor
             step =  (end[i][j]-ini[i][j])/steps
             if step == 0:
@@ -41,7 +41,7 @@ def run():
     j.set_joints([0,0,0,0,0,0,0,0,0,0,0,0], mode='deg')
     time.sleep(2)
     f = open('Dataset.txt', 'w')
-    for iterations in range(20):
+    for iterations in range(4):
         currentgait = []
         angList = []
         actions = []
@@ -50,9 +50,9 @@ def run():
         # (direction, gait, walkDistance, bh, turn, plot)
         while True:
             if randint(0,1):
-                cmd = "ang = GenerateAngularGait(%d, %f, 0.08, 0, %d)"%(randint(0,1), uniform(0.1, 2), randint(60, 250))
+                cmd = "ang = GenerateAngularGait(%d, %f, 0.08, 0, %d)"%(randint(0,1), uniform(0.1, 2), randint(60, 350))
             else:
-                cmd =        "ang = GenerateGait(%d, %f, 0.08, 0, %d)"%(randint(0,1), uniform(0.1, 2), randint(60, 250))
+                cmd =        "ang = GenerateGait(%d, %f, 0.08, 0, %d)"%(randint(0,1), uniform(0.1, 2), randint(60, 350))
             try:
                 matSess.run(cmd)
                 print iterations, ": " , cmd
@@ -90,6 +90,10 @@ def run():
         yVel = round(np.mean([s.Twist.linear.y for s in states][31:-1]),3)
         aVel = round(np.mean([s.IMU.angular_velocity.z for s in states][31:-1]),3)
         # write to file
+        #header
+        print ""
+        print ("x_vel_set y_vel_set angular_vel_set motor_state_0 motor_state_1 motor_state_2 motor_state_3 motor_state_4 motor_state_5 motor_state_6 motor_state_7 motor_state_8 motor_state_9 motor_state_10 motor_state_11 ground_colision_0 ground_colision_1 ground_colision_2 ground_colision_3 orientation_quaternion_x orientation_quaternion_y orientation_quaternion_z orientation_quaternion_w angular_vel_x angular_vel_y angular_vel_z linear_acceleration_x linear_acceleration_y linear_acceleration_z linear_velocity_x linear_velocity_y linear_velocity_z action_0 action_1 action_2 action_3 action_4 action_5 action_6 action_7 action_8 action_9 action_10 action_11")
+        print ""
         for i in range(len(actions)):
             ### INPUTS
             # setpoints
