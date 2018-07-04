@@ -6,12 +6,46 @@ from keras.callbacks import TensorBoard
 from keras import optimizers
 from math import sqrt, isnan
 import matplotlib.pyplot as plt
+from matplotlib.collections import EllipseCollection
 import time
 import os
 import errno
 import random
 import pandas as pd
 import numpy as np
+
+def plot_corr_ellipses(data, ax=None, **kwargs):
+
+    M = np.array(data)
+    if not M.ndim == 2:
+        raise ValueError('data must be a 2D array')
+    if ax is None:
+        fig, ax = plt.subplots(1, 1, subplot_kw={'aspect':'equal'})
+        ax.set_xlim(-0.5, M.shape[1] - 0.5)
+        ax.set_ylim(-0.5, M.shape[0] - 0.5)
+
+    # xy locations of each ellipse center
+    xy = np.indices(M.shape)[::-1].reshape(2, -1).T
+
+    # set the relative sizes of the major/minor axes according to the strength of
+    # the positive/negative correlation
+    w = np.ones_like(M).ravel()
+    h = 1 - np.abs(M).ravel()
+    a = 45 * np.sign(M).ravel()
+
+    ec = EllipseCollection(widths=w, heights=h, angles=a, units='x', offsets=xy,
+                           transOffset=ax.transData, array=M.ravel(), **kwargs)
+    ax.add_collection(ec)
+
+    # if data is a DataFrame, use the row/column names as tick labels
+    if isinstance(data, pd.DataFrame):
+        ax.set_xticks(np.arange(M.shape[1]))
+        ax.set_xticklabels(data.columns, rotation=90)
+        ax.set_yticks(np.arange(M.shape[0]))
+        ax.set_yticklabels(data.index)
+    # 2222
+    
+    return ec
 
 def mkdir_p(path):
     try:
@@ -77,7 +111,7 @@ class neuralNet(object):
         # print self.data
         # print self.data.describe()
 
-    def Split(self, validation_proportion=0.15, target_numbers=12):
+    def Split(self, validation_proportion=0.30, target_numbers=12):
         """Split the class data into targets and labels for a validation and training and return a dictonary containing all 4 of the sets
         also keep a copy from it into the class.
         
@@ -213,8 +247,8 @@ class neuralNet(object):
                 plt.show()
         # return metrics
         if isnan(history.history['acc'][-1]) or isnan(history.history['val_loss'][-1]) or isnan(history.history['loss'][-1]):
-            return 0, 0
-        return history.history['val_acc'][-1]
+            return float(0.0)
+        return float(history.history['val_acc'][-1])
     
     # EVOLUTION
     def validate_individual(self, vec, bounds, float_index_list):
@@ -297,7 +331,7 @@ class neuralNet(object):
             print "Epoch %3i time: %.2fmin"%(i,(time.time() - time_before)/60)
             print "="*120
             epoch_acc = epoch_acc.append({'Max':max(fitness_vec), 'mean':sum(fitness_vec)/len(fitness_vec), 'Min':min(fitness_vec)}, ignore_index=True)
-            epoch_acc.to_csv(self.log_path+'/LifCyle.csv', index=False)
+            epoch_acc.to_csv(self.log_path+'/LifeCycle.csv', index=False)
             time_before = time.time()
             # For each individual
             for j in range(0, population_size):
@@ -328,14 +362,16 @@ class neuralNet(object):
                 # Selection: Greedy
                 # if new individual is better than the current, replace it
                 Title =  "Epoch: %3i, Individual: %3i - "%(i,j) + str([round(p, 2) for p in recombined])
+
                 recombined_fit = self.fitness(recombined, training_epochs, title=Title)
                 print round(recombined_fit, 2), 
+                
                 if recombined_fit > fitness_vec[j]:
                     fitness_vec[j] = recombined_fit
                     population[j] = recombined
-                    print " Survived."
+                    print " Spawn survived."
                 else:
-                    print " Died."
+                    print " Spawn died."
         
         # Print fitness status
         # and log to file for later use if need be
@@ -348,24 +384,66 @@ class neuralNet(object):
         print "="*120
         time_before = time.time()
     
+    def plot_lifecyle(self, path=None):
+        if path is None:
+            lcl = pd.read_csv(self.log_path+"/LifeCycle.csv")
+            pop = pd.read_csv(self.log_path+"/population.csv")
+        else:
+            lcl = pd.read_csv(path+"/LifeCycle.1.csv")
+            pop = pd.read_csv(path+"/population.csv")
+        fig = plt.figure()
+        ax = plt.subplot2grid((2,2),(0, 0))
+        ax1 = plt.subplot2grid((2,2), (0,0), colspan=2)
+        ax2 = plt.subplot2grid((2,2), (1,0), colspan=1)
+        ax3 = plt.subplot2grid((2,2), (1,1), colspan=1)
+        
+        # Fitnss over time
+        ax1.set_title("Population accuracy on validation dataset")
+        ax1.set_xlabel("Epoch")
+        ax1.set_ylabel("Accuracy")
+        ax1.plot(lcl['Max'])
+        ax1.plot(lcl['mean'])
+        ax1.plot(lcl['Min'])
+        ax1.legend(["Max","Mean", "Min"])
+        ax1.set_yticks([0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1])
+        ax1.grid()
+
+        # Correlation
+        ax2.set_title("Correlation")
+        corr_df = pop.copy()
+        corr_df = pd.DataFrame({'Accuracy':corr_df['Fitt'], 'Batch':corr_df['0'],'L.Rate':corr_df['1'], 'Optimzer':corr_df['2'],'Dropout':corr_df[['3', '6', '9', '12', '15']].mean(axis=1),'Nodes':corr_df[['4', '7', '10', '13', '16']].mean(axis=1), 'Activation':corr_df[['5', '8', '11', '14', '17']].mean(axis=1)})
+        corr = corr_df.corr() 
+        m = plot_corr_ellipses(corr, ax=ax2)
+        cb = fig.colorbar(m,ax=ax2)
+        cb.set_label('Correlation coefficient')
+        ax2.margins(0.1)
+        
+        # Boxplot
+        df_norm = (corr_df - corr_df.mean()) / (corr_df.max() - corr_df.min())
+        df_norm.boxplot(vert=0)
+        ax3.set_title('Boxlplot (Normalized values)')
+        ax3.set_xlim([-1, 1])
+        plt.show()
 
 # evolutivo para optimizar erro/razao entre erro de treino e erro de validacao; quando os dois divergem e sinal de overfitting
 # tensorboard --logdir logs/1
 def main():
 # How to load data
     handler = neuralNet()
-    handler.Load_Data("Dataset.txt")
-    handler.Preprocess()
-    handler.Split()
+    #handler.Load_Data("Dataset.txt")
+    #handler.Preprocess()
+    #handler.Split()
 # How to train a modelx
     # handler.model_dense()
     # handler.fit_model(plot=True)
 # how to optimize a model with diferential evolutionary algoritm
     #         batch     learn_rate   opti   [dropout nodes    activ]*10
-    bounds = [(10,100), (0.001, 1), (1,7), (0, 0.3), (5, 35), (0, 10), (0, 0.3), (5, 35), (0, 10), (0, 0.3), (5, 35), (0, 10), (0, 0.3), (5, 35), (0, 10), (0, 0.3), (5, 35), (0, 10)]
+    #bounds = [(5,100), (0.001, 1), (1,7), (0, 0.3), (5, 35), (0, 10), (0, 0.3), (5, 35), (0, 10), (0, 0.3), (5, 35), (0, 10), (0, 0.3), (5, 35), (0, 10), (0, 0.3), (5, 35), (0, 10)]
     # indexes of which positions in bounds should NOT be integers
-    float_indexes = [1, 3, 6, 9, 12, 15, 18, 21, 24, 27, 30]
-    handler.differential_evolution(4, 0.8, 0.6, bounds, float_indexes, 50, training_epochs = 2, file='logs/population.csv')
+    #float_indexes = [1, 3, 6, 9, 12, 15, 18, 21, 24, 27, 30]
+    #handler.differential_evolution(10, 0.3, 0.4, bounds, float_indexes, 100, training_epochs = 15, file='logs/population.csv')
+    handler.plot_lifecyle()
+
 if __name__ == '__main__':
        main()
         
