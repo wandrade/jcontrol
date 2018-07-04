@@ -24,9 +24,11 @@ def mkdir_p(path):
 
 class neuralNet(object):
     def __init__(self, *args):
-        pd.options.display.max_rows = 8
-        pd.options.display.float_format = '{:.1f}'.format
-
+        pd.options.display.max_rows = 12
+        pd.options.display.float_format = '{:.2f}'.format
+        self.log_path = os.getcwd()
+        self.log_path = self.log_path + "/logs"
+        mkdir_p(self.log_path)
     def Load_Data(self, file):
         """Get gait data from file
         
@@ -161,19 +163,18 @@ class neuralNet(object):
         model.compile(loss='mean_squared_error', optimizer=opti, metrics=['mae', 'accuracy'])
         self.model = model
     
-    def fit_model(self, epochs=5, plot=None, verbose=0, log=True):
-        # create log path
-        log_path = os.getcwd()
-        log_path = log_path + "/logs/" + self.model_name + time.strftime('_%Y-%m-%d_%H-%M-%S')
-        mkdir_p(log_path)
-        if log: 
+    def fit_model(self, epochs=5, plot=None, verbose=0, log=True, title="Model Fitting"):
+        
+        if log == True: # create log path
+            log_path =  self.log_path + self.model_name + time.strftime('_%Y-%m-%d_%H-%M-%S')
             print "Logging to ", log_path
+            mkdir_p(log_path)
             tensorboard = TensorBoard(log_dir=log_path)
+            # log for tensorboard visualization
+            plot_model(self.model, to_file=log_path+'/model.png', show_shapes=True, show_layer_names=True)
             cb = [tensorboard]
         else:
             cb = []
-        # log for tensorboard visualization
-        plot_model(self.model, to_file=log_path+'/model.png', show_shapes=True, show_layer_names=True)
         # fit model
         history = self.model.fit( self.dataset['training']['labels'], 
                         self.dataset['training']['targets'], 
@@ -184,29 +185,36 @@ class neuralNet(object):
                                             self.dataset['validation']['targets']),
                         verbose = verbose)
         if plot is not None:
+            plt.clf()
+            plt.suptitle(title)
             # print(history.history.keys())
             # summarize history for accuracy
             plt.subplot(1,2,1)
             plt.plot(history.history['acc'])
             plt.plot(history.history['val_acc'])
-            plt.title('model accuracy')
+            plt.title('Accuracy')
             plt.ylabel('accuracy')
             plt.xlabel('epoch')
-            plt.legend(['train', 'test'], loc='upper left')
-            plt.subplot(1,2,2)
+            plt.grid()
+
             # summarize history for loss
+            plt.subplot(1,2,2)
             plt.plot(history.history['loss'])
             plt.plot(history.history['val_loss'])
-            plt.title('model loss')
+            plt.title('Loss')
             plt.ylabel('loss')
             plt.xlabel('epoch')
-            plt.legend(['train', 'test'], loc='upper left')
+            plt.legend(['Training', 'Validation'], loc='lower right')
             plt.grid()
-            plt.show()
+            if plot == 1:
+                plt.draw()
+                plt.pause(0.001)
+            else:
+                plt.show()
         # return metrics
         if isnan(history.history['acc'][-1]) or isnan(history.history['val_loss'][-1]) or isnan(history.history['loss'][-1]):
             return 0, 0
-        return history.history['acc'][-1], sqrt(pow(history.history['loss'][-1]-history.history['val_loss'][-1],2))
+        return history.history['val_acc'][-1]
     
     # EVOLUTION
     def validate_individual(self, vec, bounds, float_index_list):
@@ -244,43 +252,53 @@ class neuralNet(object):
             i = i + 3
         return batch, lr, opti, topology
     
-    def fitness(self, individual,verbosity=0):
+    def fitness(self, individual, training_epochs, verbosity=0, title="Individual Fitness"):
         b, l, opti, top = self.convert_to_model(individual)
         # create model
         self.model_dense(b, l, opti, top)
         # train and evaluate
-        accuracy, loss_diff = self.fit_model(epochs=100, log=False, verbose=verbosity)
-        # value accuracy, but the higher the loss_diff between validation and training set, the lower the fitness. This avoids overfitting
-        loss_diff = loss_diff*10
-        if loss_diff <= 1: loss_diff = 1
-        fitness = accuracy/loss_diff
-        return fitness
+        return self.fit_model(epochs=training_epochs, log=False, verbose=verbosity, plot=1, title=title)
 
-    def differential_evolution(self, population_size, mutation_factor, crossover_factor, bounds, float_index_list, epochs):
+    def differential_evolution(self, population_size, mutation_factor, crossover_factor, bounds, float_index_list, epochs, training_epochs=100, file=None):
         ### INITIALIZE POPULATION
         population = []
         fitness_vec = []
+        epoch_acc = pd.DataFrame(columns=['Max', 'mean', 'Min'])
+        time_before = time.time()
         print "Initializing population."
-        for i in range(0, population_size):
-            indv = []
-            for j in range(len(bounds)):
-                indv.append(random.uniform(bounds[j][0],bounds[j][1]))
-            indv = self.validate_individual(indv, bounds, float_index_list)
-            population.append(indv)
-            # calculate fitness
-            fitness_vec.append(self.fitness(indv, verbosity=1))
+        if file is None:
+            for i in range(0, population_size):
+                indv = []
+                for j in range(len(bounds)):
+                    indv.append(random.uniform(bounds[j][0],bounds[j][1]))
+                indv = self.validate_individual(indv, bounds, float_index_list)
+                population.append(indv)
+                # calculate fitness
+                fitness_vec.append(self.fitness(indv, training_epochs))
+        else: # read from file but recalculate fitness (method might have changed)
+            population = pd.read_csv(file)
+            population.drop(population.columns[[0]], axis=1, inplace=True)
+            population = population.values.tolist()
+            print population
+            for indv in population:
+                indv = self.validate_individual(indv, bounds, float_index_list)
+                fitness_vec.append(self.fitness(indv, training_epochs))
+            
         ### Evolutionary loop
         # For each epoch
-        time_before = time.time()
         for i in range(1,epochs+1):
             # Print fitness status
-            print pd.DataFrame(population)
-            avg = sum(fitness_vec)/len(fitness_vec)
-            print i, "/", epochs, ' - max:%.2f'%max(fitness_vec), " min:%.2f"%min(fitness_vec), " avg:%.2f"%avg
-            print "Best/Worst:"
-            print pd.DataFrame([population[fitness_vec.index(max(fitness_vec))], population[fitness_vec.index(min(fitness_vec))]])
-            print (time.time() - time_before)/60
-            print "="*30
+            # and log to file for later use if need be
+            temp = pd.DataFrame(population)
+            temp.insert(0, 'Fitt', fitness_vec)
+            print temp
+            print temp.describe(percentiles=[])
+            temp.to_csv(self.log_path+'/population.csv', index=False)
+            print "Epoch %3i time: %.2fmin"%(i,(time.time() - time_before)/60)
+            print "="*120
+            epoch_acc = epoch_acc.append({'Max':max(fitness_vec), 'mean':sum(fitness_vec)/len(fitness_vec), 'Min':min(fitness_vec)}, ignore_index=True)
+            epoch_acc.to_csv(self.log_path+'/LifCyle.csv', index=False)
+            time_before = time.time()
             # For each individual
             for j in range(0, population_size):
                 # Mutate
@@ -300,23 +318,35 @@ class neuralNet(object):
 
                 # Crossover
                 recombined = []
-                for i in range(len(bounds)):
+                for k in range(len(bounds)):
                     if(random.random() <= crossover_factor):
-                        recombined.append(donor[i])
+                        recombined.append(donor[k])
                     else:
-                        recombined.append(population[j][i])
-                
+                        recombined.append(population[j][k])
+                recombined = self.validate_individual(recombined, bounds, float_index_list)
+                print [round(p, 2) for p in recombined],
                 # Selection: Greedy
                 # if new individual is better than the current, replace it
-                recombined_fit = self.fitness(recombined)
+                Title =  "Epoch: %3i, Individual: %3i - "%(i,j) + str([round(p, 2) for p in recombined])
+                recombined_fit = self.fitness(recombined, training_epochs, title=Title)
+                print round(recombined_fit, 2), 
                 if recombined_fit > fitness_vec[j]:
                     fitness_vec[j] = recombined_fit
                     population[j] = recombined
-
-
-
+                    print " Survived."
+                else:
+                    print " Died."
         
-        # return best_individual
+        # Print fitness status
+        # and log to file for later use if need be
+        temp = pd.DataFrame(population)
+        temp.insert(0, 'Fitt', fitness_vec)
+        print temp
+        print temp.describe(percentiles=[])
+        temp.to_csv(self.log_path+'/population.csv', index=False)
+        print (time.time() - time_before)/60
+        print "="*120
+        time_before = time.time()
     
 
 # evolutivo para optimizar erro/razao entre erro de treino e erro de validacao; quando os dois divergem e sinal de overfitting
@@ -327,15 +357,15 @@ def main():
     handler.Load_Data("Dataset.txt")
     handler.Preprocess()
     handler.Split()
-# How to train a model
+# How to train a modelx
     # handler.model_dense()
     # handler.fit_model(plot=True)
 # how to optimize a model with diferential evolutionary algoritm
     #         batch     learn_rate   opti   [dropout nodes    activ]*10
-    bounds = [(1,500), (0.00001, 1), (1,7), (0, 1), (1, 60), (0, 10), (0, 1), (1, 60), (0, 10), (0, 1), (1, 60), (0, 10), (0, 1), (1, 60), (0, 10), (0, 1), (1, 60), (0, 10), (0, 1), (1, 60), (0, 10), (0, 1), (1, 60), (0, 10), (0, 1), (1, 60), (0, 10), (0, 1), (1, 60), (0, 10), (0, 1), (1, 60), (0, 10)]
+    bounds = [(10,100), (0.001, 1), (1,7), (0, 0.3), (5, 35), (0, 10), (0, 0.3), (5, 35), (0, 10), (0, 0.3), (5, 35), (0, 10), (0, 0.3), (5, 35), (0, 10), (0, 0.3), (5, 35), (0, 10)]
     # indexes of which positions in bounds should NOT be integers
     float_indexes = [1, 3, 6, 9, 12, 15, 18, 21, 24, 27, 30]
-    handler.differential_evolution(10, 0.5, 0.6, bounds, float_indexes, 100)
+    handler.differential_evolution(4, 0.8, 0.6, bounds, float_indexes, 50, training_epochs = 2, file='logs/population.csv')
 if __name__ == '__main__':
        main()
         
