@@ -56,6 +56,8 @@ def mkdir_p(path):
         else:
             raise
 
+def amap(x, in_min, in_max, out_min, out_max):
+    return (x - in_min) * (out_max - out_min) / (in_max - in_min) + out_min
 class neuralNet(object):
     def __init__(self, *args):
         pd.options.display.max_rows = 12
@@ -392,7 +394,7 @@ class neuralNet(object):
             lcl = pd.read_csv(path+"/LifeCycle.1.csv")
             pop = pd.read_csv(path+"/population.csv")
         fig = plt.figure()
-        ax = plt.subplot2grid((2,2),(0, 0))
+        plt.subplot2grid((2,2),(0, 0))
         ax1 = plt.subplot2grid((2,2), (0,0), colspan=2)
         ax2 = plt.subplot2grid((2,2), (1,0), colspan=1)
         ax3 = plt.subplot2grid((2,2), (1,1), colspan=1)
@@ -411,7 +413,7 @@ class neuralNet(object):
         # Correlation
         ax2.set_title("Correlation")
         corr_df = pop.copy()
-        corr_df = pd.DataFrame({'Accuracy':corr_df['Fitt'], 'Batch':corr_df['0'],'L.Rate':corr_df['1'], 'Optimzer':corr_df['2'],'Dropout':corr_df[['3', '6', '9', '12', '15']].mean(axis=1),'Nodes':corr_df[['4', '7', '10', '13', '16']].mean(axis=1), 'Activation':corr_df[['5', '8', '11', '14', '17']].mean(axis=1)})
+        corr_df = pd.DataFrame({'Accuracy':corr_df['Fitt'], 'Batch':corr_df['0'],'L.Rate':corr_df['1'], 'Optimizer':corr_df['2'],'Dropout':corr_df[['3', '6', '9', '12', '15']].mean(axis=1),'Nodes per layer':corr_df[['4', '7', '10', '13', '16']].mean(axis=1), 'Activation':corr_df[['5', '8', '11', '14', '17']].mean(axis=1)})
         corr = corr_df.corr() 
         m = plot_corr_ellipses(corr, ax=ax2)
         cb = fig.colorbar(m,ax=ax2)
@@ -419,31 +421,49 @@ class neuralNet(object):
         ax2.margins(0.1)
         
         # Boxplot
-        df_norm = (corr_df - corr_df.mean()) / (corr_df.max() - corr_df.min())
+        df_norm = corr_df.copy()
+        # Normalize
+        df_norm['Activation'] = amap(df_norm['Activation'], 0, 10, 0, 1)
+        df_norm['Batch'] = amap(df_norm['Batch'], 0, 100, 0, 1)
+        df_norm['Dropout'] = amap(df_norm['Dropout'], 0, 0.5, 0, 1)
+        df_norm['L.Rate'] = amap(df_norm['L.Rate'], 0.0001, 0.1, 0, 1)
+        df_norm['Nodes per layer'] = amap(df_norm['Nodes per layer'], 5, 35, 0, 1)
+        df_norm['Optimizer'] = amap(df_norm['Optimizer'], 1, 7, 0, 1)
         df_norm.boxplot(vert=0)
-        ax3.set_title('Boxlplot (Normalized values)')
-        ax3.set_xlim([-1, 1])
+        # scatter
+        print corr_df
+        print df_norm
+        for i in range(1, 7+1):
+            y = df_norm[df_norm.columns[i-1]].tolist()
+            # Add some random "jitter" to the x-axis
+            x = np.random.normal(i, 0.04, size=len(y))
+            ax3.plot(y, x, 'r.', alpha=0.5)
+
+        ax3.set_title('Final population dispersion')
+        ax3.set_xlim([-0.12, 1.12])
+        ax3.set_xticklabels(['0%', "25%", "50%", "75%", "100%"])
+        ax3.set_xticks([0, 0.25, 0.50, 0.75, 1])
+        ax3.set_xlabel("Search range")
         plt.show()
 
-# evolutivo para optimizar erro/razao entre erro de treino e erro de validacao; quando os dois divergem e sinal de overfitting
 # tensorboard --logdir logs/1
 def main():
 # How to load data
     handler = neuralNet()
-    #handler.Load_Data("Dataset.txt")
-    #handler.Preprocess()
-    #handler.Split()
-# How to train a modelx
+    handler.Load_Data("Dataset.txt")
+    handler.Preprocess()
+    handler.Split()
+# How to train a model
     # handler.model_dense()
     # handler.fit_model(plot=True)
 # how to optimize a model with diferential evolutionary algoritm
     #         batch     learn_rate   opti   [dropout nodes    activ]*10
-    #bounds = [(5,100), (0.001, 1), (1,7), (0, 0.3), (5, 35), (0, 10), (0, 0.3), (5, 35), (0, 10), (0, 0.3), (5, 35), (0, 10), (0, 0.3), (5, 35), (0, 10), (0, 0.3), (5, 35), (0, 10)]
+    bounds = [(0,100), (0.0001, 1), (1,7), (0, 0.5), (5, 35), (0, 10), (0, 0.5), (5, 35), (0, 10), (0, 0.5), (5, 35), (0, 10), (0, 0.5), (5, 35), (0, 10), (0, 0.5), (5, 35), (0, 10)]
     # indexes of which positions in bounds should NOT be integers
-    #float_indexes = [1, 3, 6, 9, 12, 15, 18, 21, 24, 27, 30]
-    #handler.differential_evolution(10, 0.3, 0.4, bounds, float_indexes, 100, training_epochs = 15, file='logs/population.csv')
+    float_indexes = [1, 3, 6, 9, 12, 15, 18, 21, 24, 27, 30]
     handler.plot_lifecyle()
-
+    #handler.differential_evolution(10, 0.3, 0.4, bounds, float_indexes, 100, training_epochs = 20, file='logs/population.csv')
+    
 if __name__ == '__main__':
        main()
         
