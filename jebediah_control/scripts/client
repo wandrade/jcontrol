@@ -6,6 +6,7 @@ echo "Client $hn connecting to server $sv"
 export ROS_IP=$hn
 export ROS_HOSTNAME=$hn
 export ROS_MASTER_URI="http://$sv:11311"
-rosrun jebediah_control controller
+#rosrun jebediah_control controller
+rosrun jebediah_control gait.py
 
 

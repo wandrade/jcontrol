@@ -65,6 +65,7 @@ class neuralNet(object):
         self.log_path = os.getcwd()
         self.log_path = self.log_path + "/logs"
         mkdir_p(self.log_path)
+    
     def Load_Data(self, file):
         """Get gait data from file
         
@@ -450,20 +451,24 @@ class neuralNet(object):
 def main():
 # How to load data
     handler = neuralNet()
-    handler.Load_Data("Dataset.txt")
+    handler.Load_Data("Dataset_evo.txt")
     handler.Preprocess()
     handler.Split()
-# How to train a model
-    # handler.model_dense()
-    # handler.fit_model(plot=True)
 # how to optimize a model with diferential evolutionary algoritm
-    #         batch     learn_rate   opti   [dropout nodes    activ]*10
-    bounds = [(0,100), (0.0001, 1), (1,7), (0, 0.5), (5, 35), (0, 10), (0, 0.5), (5, 35), (0, 10), (0, 0.5), (5, 35), (0, 10), (0, 0.5), (5, 35), (0, 10), (0, 0.5), (5, 35), (0, 10)]
+    #         batch     learn_rate   opti   [dropout nodes    activ]*5
+    #bounds = [(0,100), (0.0001, 1), (1,7), (0, 0.5), (5, 35), (0, 10), (0, 0.5), (5, 35), (0, 10), (0, 0.5), (5, 35), (0, 10), (0, 0.5), (5, 35), (0, 10), (0, 0.5), (5, 35), (0, 10)]
     # indexes of which positions in bounds should NOT be integers
-    float_indexes = [1, 3, 6, 9, 12, 15, 18, 21, 24, 27, 30]
-    handler.plot_lifecyle()
+    #float_indexes = [1, 3, 6, 9, 12, 15, 18, 21, 24, 27, 30]
+    #handler.plot_lifecyle()
     #handler.differential_evolution(10, 0.3, 0.4, bounds, float_indexes, 100, training_epochs = 20, file='logs/population.csv')
-    
+
+# How to train a model
+    model_params = [28,0.001,1,0.14648027522113666,29,6,0.061823841249279636,27,1,0.01718821527432175,20,6,0.1484149891194993,23,4,0.11439136178591673,33,4]
+    batch, lr, opti, topo = handler.convert_to_model(model_params)
+    print topo
+    handler.model_dense(batch=batch, learning_rate=lr, optimizer=opti, topology=topo)
+    handler.fit_model(epochs=100, plot=2, verbose=2, log=True, title='Model Training')
+    # handler.fit_model(plot=True)
 if __name__ == '__main__':
        main()
         

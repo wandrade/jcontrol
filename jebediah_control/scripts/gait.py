@@ -12,7 +12,7 @@ from random import *
 j = jcontroller()
     # Start matlab session
 matSess=pymatlab.session_factory()
-matSess.run("addpath('~/Omnidirectional-Static-Walking-of-Quadruped/')")
+matSess.run("addpath(genpath('~/catkin_ws/src'))")
 
 def joinLists(a, b, steps = 30):
     # generate intermediary stepts
@@ -20,7 +20,7 @@ def joinLists(a, b, steps = 30):
     loa = [] # list of actuators
     ini = a[-1]
     end = b[0]
-    for i in range (1): # for each leg
+    for i in range (4): # for each leg
         for j in range(3): # for each motor
             step =  (end[i][j]-ini[i][j])/steps
             if step == 0:
@@ -39,22 +39,21 @@ def joinLists(a, b, steps = 30):
 
 def run():
     j.set_joints([0,0,0,0,0,0,0,0,0,0,0,0], mode='deg')
-    time.sleep(2)
     f = open('Dataset.txt', 'w')
-    for iterations in range(4):
+    for iterations in range(80):
         currentgait = []
         angList = []
         actions = []
         states = []
         # Generate path
-        # (direction, gait, walkDistance, bh, turn, plot)
+        # (direction, walkDistance, bh, plot, steps)
         while True:
             if randint(0,1):
-                cmd = "ang = GenerateAngularGait(%d, %f, 0.08, 0, %d)"%(randint(0,1), uniform(0.1, 2), randint(60, 350))
+                cmd = "ang = GenerateAngularGait(%d, %f, 0.08, 0, %d)"%(randint(0,1), uniform(0.1, 0.5), randint(60, 350))
             else:
-                cmd =        "ang = GenerateGait(%d, %f, 0.08, 0, %d)"%(randint(0,1), uniform(0.1, 2), randint(60, 350))
+                cmd =        "ang = GenerateGait(%d, %f, 0.08, 0, %d)"%(randint(0,3), uniform(0.1, 2), randint(60, 350))
             try:
-                matSess.run(cmd)
+                print matSess.run(cmd)
                 print iterations, ": " , cmd
                 break
             except:
@@ -117,7 +116,6 @@ def run():
             f.write('%s\n' % line)
         print xVel, yVel, aVel;
         
-print('Starting in 2s...')
 run()
 
 
