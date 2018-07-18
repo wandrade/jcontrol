@@ -1,3 +1,4 @@
 *.pyc
 jebediah_control/scripts/neuralnet/logs/*
 !jebediah_control/scripts/neuralnet/logs/*.*
+jebediah_control/scripts/neuralnet/logs/Dataset\.txt
