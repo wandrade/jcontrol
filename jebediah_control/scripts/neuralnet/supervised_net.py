@@ -4,6 +4,7 @@ from keras.layers import *
 from keras.utils import plot_model
 from keras.callbacks import TensorBoard
 from keras import optimizers
+from keras.models import model_from_json
 from math import sqrt, isnan
 import matplotlib.pyplot as plt
 from matplotlib.collections import EllipseCollection
@@ -13,6 +14,7 @@ import errno
 import random
 import pandas as pd
 import numpy as np
+import pickle
 
 def plot_corr_ellipses(data, ax=None, **kwargs):
 
@@ -65,6 +67,7 @@ class neuralNet(object):
         self.log_path = os.getcwd()
         self.log_path = self.log_path + "/logs"
         mkdir_p(self.log_path)
+        random.seed(1)
     
     def Load_Data(self, file):
         """Get gait data from file
@@ -114,14 +117,14 @@ class neuralNet(object):
         # print self.data
         # print self.data.describe()
 
-    def Split(self, validation_proportion=0.30, target_numbers=12):
+    def Split(self, validation_proportion=0.30, target_numbers=12, randomize=False):
         """Split the class data into targets and labels for a validation and training and return a dictonary containing all 4 of the sets
         also keep a copy from it into the class.
         
         Keyword Arguments:
             validation_proportion {float} -- [Which proportion of the data will me separated for validation] (default: {0.3})
             target_numbers {int} -- [Number of targets (must all be the end of the dataset)] (default: {12})
-        
+            randomize {bool} -- [If false get data from end of vector, if true get random portion]
         Returns:
             [Dictionary] -- [Containing a label 'training' and 'validation' each also containing a label 'labels' and 'targets' which are pandas datasets]
         """
@@ -133,8 +136,17 @@ class neuralNet(object):
         print "Training:    ", training_length
         print "Validation:  ", validation_length
         print "Total:       ", len(self.data)
-        training = self.data.head(training_length) 
-        validation = self.data.tail(validation_length)
+        
+        if randomize is True:
+            # get position where to starts cutting
+            random_portion = random.randint(0,len(self.data)-validation_length-1) # dont get tips for ease of implementation
+            # Remove validation of dataset and save to training
+            training = self.data.drop(self.data.index[random_portion:validation_length+random_portion])
+            validation = self.data.drop(training.index)
+        else:
+            training = self.data.head(training_length) 
+            validation = self.data.tail(validation_length)
+        
         # Separate target and validation
         column_numbers = len(validation.columns) # keep it variable due to possible sintetic labels
         tra_labels = training.iloc[:,0:column_numbers-target_numbers]
@@ -170,6 +182,8 @@ class neuralNet(object):
             opti = optimizers.Adamax(lr=learning_rate, beta_1=0.9, beta_2=0.999, epsilon=None, decay=0.0)
         elif optimizer == 7:
             opti = optimizers.Nadam(lr=learning_rate, beta_1=0.9, beta_2=0.999, epsilon=None, schedule_decay=0.004)
+        self.optimizer = optimizer
+        self.learning_rate = learning_rate
         # topology
         # [dropout layer_nodes activation] 
         # convert num to activation 
@@ -226,7 +240,7 @@ class neuralNet(object):
             plt.suptitle(title)
             # print(history.history.keys())
             # summarize history for accuracy
-            plt.subplot(1,2,1)
+            plt.subplot(2,1,1)
             plt.plot(history.history['acc'])
             plt.plot(history.history['val_acc'])
             plt.title('Accuracy')
@@ -235,7 +249,7 @@ class neuralNet(object):
             plt.grid()
 
             # summarize history for loss
-            plt.subplot(1,2,2)
+            plt.subplot(2,1,2)
             plt.plot(history.history['loss'])
             plt.plot(history.history['val_loss'])
             plt.title('Loss')
@@ -252,6 +266,54 @@ class neuralNet(object):
         if isnan(history.history['acc'][-1]) or isnan(history.history['val_loss'][-1]) or isnan(history.history['loss'][-1]):
             return float(0.0)
         return float(history.history['val_acc'][-1])
+    
+    def save_model(self, path="logs/model"):
+        # serialize model to JSON
+        model_json = self.model.to_json()
+        with open(path+"_topology.json", "w") as json_file:
+            json_file.write(model_json)
+        # serialize weights to HDF5
+        self.model.save_weights(path+"_weights.h5")
+        # save model's optimizer
+        with open(path+"_optimizer.bin", "wb") as opti_file:
+            pickle.dump([self.optimizer, self.learning_rate], opti_file)
+        print("Saved model to disk")
+
+    def load_model(self, path="logs/model"):
+        # load json and create model
+        json_file = open(path+"_topology.json", 'r')
+        loaded_model_json = json_file.read()
+        json_file.close()
+        self.model = model_from_json(loaded_model_json)
+        # load weights into new model
+        self.model.load_weights(path+"_weights.h5")
+        # Load model optimizer
+        opti_file = open(path+"_optimizer.bin", 'rb')
+        self.optimizer, self.learning_rate = pickle.load(opti_file)
+        # Optimizer
+        if self.optimizer == 1:
+            opti = optimizers.Adam(lr=self.learning_rate, epsilon=None, decay=0.0)
+        elif self.optimizer == 2:
+            opti = optimizers.SGD(lr=self.learning_rate, decay=1e-6, momentum=0.9, nesterov=True)
+        elif self.optimizer == 3:
+            opti = optimizers.RMSprop(lr=self.learning_rate, rho=0.9, epsilon=None, decay=0.0)
+        elif self.optimizer == 4:
+            opti = optimizers.Adagrad(lr=self.learning_rate, epsilon=None, decay=0.0)
+        elif self.optimizer == 5:
+            opti = optimizers.Adadelta(lr=self.learning_rate, rho=0.95, epsilon=None, decay=0.0)
+        elif self.optimizer == 6:
+            opti = optimizers.Adamax(lr=self.learning_rate, beta_1=0.9, beta_2=0.999, epsilon=None, decay=0.0)
+        elif self.optimizer == 7:
+            opti = optimizers.Nadam(lr=self.learning_rate, beta_1=0.9, beta_2=0.999, epsilon=None, schedule_decay=0.004)
+        # compile model
+        self.model.compile(loss='mean_squared_error', optimizer=opti, metrics=['mae', 'accuracy'])
+        print("Loaded model from disk")
+
+    def model_eval(self):
+        # evaluate the model
+        scores = self.model.evaluate(self.dataset['validation']['labels'],self.dataset['validation']['targets'] , verbose=0)
+        print("%s: %.2f%%" % (self.model.metrics_names[1], scores[1]*100))
+        return scores[1]*100
     
     # EVOLUTION
     def validate_individual(self, vec, bounds, float_index_list):
@@ -449,26 +511,89 @@ class neuralNet(object):
 
 # tensorboard --logdir logs/1
 def main():
+
 # How to load data
+# first you need to load the data to optimize then train the model
+# there is a smaller dataset for evolutionary puproses caled Dataset_evo.txt instide neuralnet/logs folder
+# and a second bigger one called Dataset which is the real training dataset, load each one accordinly
+    start_time = time.time()
+    print "Started at %s"%time.strftime('_%Y-%m-%d_%H-%M-%S')
     handler = neuralNet()
-    handler.Load_Data("Dataset_evo.txt")
+    handler.Load_Data("logs/Dataset.txt")
     handler.Preprocess()
     handler.Split()
 # how to optimize a model with diferential evolutionary algoritm
-    #         batch     learn_rate   opti   [dropout nodes    activ]*5
+# if yo have no model, you first have to run the optimizer to determine the best topology and hiperparameters
+# run the code bellow, where bounds specify the search range and the max number for instance 5 layers
+    #         batch     learn_rate   opti   [dropout  nodes    activ]   [dropout  nodes    activ]   [dropout  nodes    activ] ... You can use as many as ou want as long as each layer has those 3 parameter   
     #bounds = [(0,100), (0.0001, 1), (1,7), (0, 0.5), (5, 35), (0, 10), (0, 0.5), (5, 35), (0, 10), (0, 0.5), (5, 35), (0, 10), (0, 0.5), (5, 35), (0, 10), (0, 0.5), (5, 35), (0, 10)]
+    # some of the values in 'bound' have to be rounded since they are ony flags, so we have to pass a list of the lumbers that should not be rounded as bellow
     # indexes of which positions in bounds should NOT be integers
     #float_indexes = [1, 3, 6, 9, 12, 15, 18, 21, 24, 27, 30]
+    # this plot the file LifeCycle of the evolutionary algorithm, this files is incremented at each generation even though the training is stoped for some reason
     #handler.plot_lifecyle()
+    # this is the actual algoritm call, it logs a 'population' file every iteration so if the training stops you can restart it by passing the file as argument
+    # if you dont want to continue from where it stoped, just remove the 'file' argument]
+    # in this file you can also se  your last population and use it as you will
     #handler.differential_evolution(10, 0.3, 0.4, bounds, float_indexes, 100, training_epochs = 20, file='logs/population.csv')
 
 # How to train a model
+# After having a good idea as to which model you should use, load the bigger dataset and run this fraction of code to train and save the model on a file
+    # got this from optimization
     model_params = [28,0.001,1,0.14648027522113666,29,6,0.061823841249279636,27,1,0.01718821527432175,20,6,0.1484149891194993,23,4,0.11439136178591673,33,4]
+    # Convert population string to parameters to create the model
     batch, lr, opti, topo = handler.convert_to_model(model_params)
-    print topo
+    print 'Layers [dropout, nodes, activation function]:'
+    for layer in topo:
+        print layer
+    # Create model
     handler.model_dense(batch=batch, learning_rate=lr, optimizer=opti, topology=topo)
-    handler.fit_model(epochs=100, plot=2, verbose=2, log=True, title='Model Training')
-    # handler.fit_model(plot=True)
+    # Here we will use a k-fold validation teqnique to trains and validade our model k times
+    # Vector to keep accuracy over each iternation
+    acc=[]
+    mae=[]
+    for k in range (10):
+        st = time.time()
+        print '='*100
+        # resplit model randomly (instead of using only the end part of the data as above)
+        handler.Split(validation_proportion=0.20, randomize=True)
+        plot_title = "Model Training: %i"%k
+        # train, plot and save value
+        acc.append(100*handler.fit_model(epochs=200, plot=1, verbose=1, log=False, title=plot_title ))
+        print ""
+        print 'Model validation:'
+        print 'Accuracy:           %.2f%%'%acc[-1]
+        mae.append(handler.model_eval())
+        time_spent = time.time()-st
+        print time_spent/(60*60)
+    print '-'*100
+    print "K-fold validation results:"
+
+    print 'Accuracy (%):'
+    acc = pd.Series(acc)
+    print acc
+    print acc.describe(percentiles=[])
+
+    print 'Mean Absolute Error (%):'
+    mae = pd.Series(mae)
+    print mae
+    print mae.describe(percentiles=[])
+
+    # train final model with all data
+    print '-'*100
+    handler.Split(validation_proportion=0.001)
+    acc = handler.fit_model(epochs=200, plot=2, log=True, title='Model training', verbose=2)
+    print 'Accuracy: %.2f%%'%acc
+    # Evaluate model
+    handler.model_eval()
+    # save model to file:
+    handler.save_model()
+
+    end_time = time.time()
+    print ""
+    print "Finished at %s"%time.strftime('_%Y-%m-%d_%H-%M-%S')
+    total = end_time - start_time
+    print "Time consumption: %.2fh"%float(total/(60*60))
 if __name__ == '__main__':
        main()
         

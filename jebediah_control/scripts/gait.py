@@ -40,7 +40,7 @@ def joinLists(a, b, steps = 30):
 def run():
     j.set_joints([0,0,0,0,0,0,0,0,0,0,0,0], mode='deg')
     f = open('Dataset.txt', 'w')
-    for iterations in range(80):
+    for iterations in range(250):
         currentgait = []
         angList = []
         actions = []
