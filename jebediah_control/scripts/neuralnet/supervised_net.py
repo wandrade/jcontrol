@@ -540,7 +540,7 @@ def main():
 # How to train a model
 # After having a good idea as to which model you should use, load the bigger dataset and run this fraction of code to train and save the model on a file
     # got this from optimization
-    model_params = [28,0.001,1,0.14648027522113666,29,6,0.061823841249279636,27,1,0.01718821527432175,20,6,0.1484149891194993,23,4,0.11439136178591673,33,4]
+    model_params = [30,0.0005,1,0.14,29,6,0.06,27,1,0.01,20,6,0.14,23,4,0.11,33,4]
     # Convert population string to parameters to create the model
     batch, lr, opti, topo = handler.convert_to_model(model_params)
     print 'Layers [dropout, nodes, activation function]:'
@@ -556,10 +556,10 @@ def main():
         st = time.time()
         print '='*100
         # resplit model randomly (instead of using only the end part of the data as above)
-        handler.Split(validation_proportion=0.20, randomize=True)
+        handler.Split(validation_proportion=0.30, randomize=True)
         plot_title = "Model Training: %i"%k
         # train, plot and save value
-        acc.append(100*handler.fit_model(epochs=200, plot=1, verbose=1, log=False, title=plot_title ))
+        acc.append(100*handler.fit_model(epochs=70, plot=1, verbose=1, log=True, title=plot_title))
         print ""
         print 'Model validation:'
         print 'Accuracy:           %.2f%%'%acc[-1]
@@ -582,7 +582,7 @@ def main():
     # train final model with all data
     print '-'*100
     handler.Split(validation_proportion=0.001)
-    acc = handler.fit_model(epochs=200, plot=2, log=True, title='Model training', verbose=2)
+    acc = handler.fit_model(epochs=70, plot=2, log=True, title='Model training', verbose=2)
     print 'Accuracy: %.2f%%'%acc
     # Evaluate model
     handler.model_eval()
