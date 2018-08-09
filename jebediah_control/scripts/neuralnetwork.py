@@ -70,6 +70,8 @@ class neuralNet(object):
         self.log_path = os.path.dirname(os.path.realpath(__file__))
         self.log_path = self.log_path + "/model"
         mkdir_p(self.log_path)
+        mkdir_p(self.log_path+"/Evolutionary_logs")
+        mkdir_p(self.log_path+"/Tensor_logs")
         random.seed(1)
         np.random.seed(1)
     
