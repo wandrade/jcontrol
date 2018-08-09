@@ -13,6 +13,7 @@ find_package(catkin REQUIRED COMPONENTS
   joint_state_controller
   robot_state_publisher
   control_msgs
+  jebediah_control
 )
 
 ## System dependencies are found with CMake's conventions

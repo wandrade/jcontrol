@@ -1,0 +1,12 @@
+#!/usr/bin/env bash
+hn=$(ifconfig | grep -Eo 'inet (addr:)?([0-9]*\.){3}[0-9]*' | grep -Eo '([0-9]*\.){3}[0-9]*' | grep -v '127.0.0.1' | grep -v 172*)
+echo "Server started at: $hn"
+export ROS_HOSTNAME=$hn
+export ROS_MASTER_URI="http://$hn:11311"
+export ROS_IP=$hn
+export LIBGL_ALWAYS_SOFTWARE=1
+export GAZEBO_IP=$hn
+export GAZEBO_MASTER_URI=$hn
+
+
+roslaunch jebediah_control server_headless.launch
