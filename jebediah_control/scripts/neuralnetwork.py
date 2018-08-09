@@ -282,8 +282,7 @@ class neuralNet(object):
         # [dropout layer_nodes activation layer_type]
         model = Sequential()
         for i, layer in enumerate(topology):
-                if i == n-1: layer[1] = len(self.dataset['training']['targets'].columns) 
-                print layer[3], type(layer[3])
+                if i == n-1: layer[1] = len(self.dataset['training']['targets'].columns)
                 if layer[3] == 0: # Dense layer
                     model.add(Dense(layer[1], input_dim=input, activation=layer[2])) 
                 elif layer[3] == 1: # LTSM layer
@@ -348,8 +347,8 @@ class neuralNet(object):
         # return metrics
         
         if isnan(history.history['acc'][-1]) or isnan(history.history['val_loss'][-1]) or isnan(history.history['loss'][-1]):
-            fitness =  float(0.0).copy()
-        fitness =  float(history.history['val_acc'][-1]).copy()
+            fitness =  float(0.0)
+        fitness =  float(history.history['val_acc'][-1])
         # clean
         if clean:
             del history
