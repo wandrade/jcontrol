@@ -281,15 +281,13 @@ class neuralNet(object):
         input = len(self.dataset['training']['labels'].columns)
         # [dropout layer_nodes activation layer_type]
         for i in range(len(topology)):
-                # force last layer to size of outputs
-                # if i == len(topology)-1:
-                #     topology[i][1] = len(self.dataset['training']['targets'].columns)
+                if i == len(topology)-1: topology[i][1] = len(self.dataset['training']['targets'].columns) 
                 if topology[i][3] == 0: # Dense layer
-                    model.add(Dense(topology[i][1], input_dim=input, activation=topology[i][2]))
-                elif topology[i][3] == 1: # LSTM Layer
-                    model.add(LSTM(topology[0][1], input_dim=input, activation=topology[i][2]))
-                elif topology[i][3] == 2: # Convolutional layer
-                    model.add(Conv1D(topology[0][1], 5, input_dim=input, activation=topology[i][2]))
+                    model.add(Dense(topology[i][1], input_dim=input, activation=topology[i][2])) 
+                elif topology[i][3] == 1: # LSTM Layer 
+                    model.add(LSTM(topology[0][1], input_dim=input, activation=topology[i][2])) 
+                elif topology[i][3] == 2: # Convolutional layer 
+                    model.add(Conv1D(topology[0][1], 5, input_dim=input, activation=topology[i][2])) 
                 model.add(Dropout(topology[i][0]))
                 input = topology[i][1]
         model.compile(loss='mean_squared_error', optimizer=opti, metrics=['mae', 'accuracy'])
@@ -467,6 +465,7 @@ class neuralNet(object):
                     elif layer[2] == 2: layer[2] = 'softmax'
                     elif layer[2] == 3: layer[2] = 'elu'
                     elif layer[2] == 4: layer[2] = 'selu'
+                    elif layer[2] == 5: layer[2] = 'softplus'
                     elif layer[2] == 6: layer[2] = 'softsign'
                     elif layer[2] == 7: layer[2] = 'tanh'
                     elif layer[2] == 8: layer[2] = 'sigmoid'
@@ -672,7 +671,7 @@ def main():
     # if yo have no model, you first have to run the optimizer to determine the best topology and hiperparameters
     # run the code bellow, where bounds specify the search range and the max number for instance 5 layers
     #         batch    learn_rate  opti   [dropout  nodes      activ    type]  [dropout  nodes      activ    type]  [dropout  nodes      activ    type]  [dropout  nodes      activ    type]  [dropout  nodes      activ    type]  [dropout  nodes      activ    type] ... You can use as many as ou want as long as each layer has those 4 parameter   
-    bounds = [(5,50), (0.0001, 1), (1,7), (0, 0.5), (45, 600), (0, 10), (0,1), (0, 0.5), (45, 600), (0, 10), (0,1), (0, 0.5), (45, 600), (0, 10), (0,1), (0, 0.5), (45, 600), (0, 10), (0,1), (0, 0.5), (45, 600), (0, 10), (0,1), (0, 0.5), (45, 600), (0, 10), (0,1)]
+    bounds = [(5,50), (0.0001, 1), (1,7), (0, 0.5), (45, 600), (0, 10), (0,0), (0, 0.5), (45, 600), (0, 10), (0,0), (0, 0.5), (45, 600), (0, 10), (0,0), (0, 0.5), (45, 600), (0, 10), (0,0), (0, 0.5), (45, 600), (0, 10), (0,0), (0, 0.5), (45, 600), (0, 10), (0,0)]
     # some of the values in 'bound' have to be rounded since they are ony flags, so we have to pass a list of the lumbers that should not be rounded as bellow
     # indexes of which positions in bounds should NOT be integers
     float_indexes = [1, 3, 7, 11, 15, 19, 23]
