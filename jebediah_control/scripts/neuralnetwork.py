@@ -231,7 +231,7 @@ class neuralNet(object):
         self.dataset = {'training':{'labels':tra_labels, 'targets':tra_targets}, 'validation':{'labels':val_labels, 'targets':val_targets}}.copy()
         return self.dataset
     
-    def model_dense(self, batch = 50, learning_rate=0.01, optimizer = 2, topology = [[0, 24, 1],[0, 24, 0],[0.1, 24, 1],[0, 24, 1],[0, 12, 1]]):
+    def set_model(self, batch = 50, learning_rate=0.01, optimizer = 2, topology = [[0, 24, 1, 1],[0, 24, 0, 1],[0.1, 24, 1, 1],[0, 24, 1, 1],[0, 12, 1, 1]]):
         """Define a dense keras module
         
         Keyword Arguments:
@@ -276,14 +276,20 @@ class neuralNet(object):
             elif topology[i][2] == 9: topology[i][2] = 'hard_sigmoid'
             elif topology[i][2] == 10: topology[i][2] = 'linear'
         
-        self.model_name = "dense"
+        self.model_name = "Deconvolutional"
         model = Sequential()
         input = len(self.dataset['training']['labels'].columns)
-        # [dropout layer_nodes activation type]
+        # [dropout layer_nodes activation layer_type]
         for i in range(len(topology)):
                 # force last layer to size of outputs
-                if i == len(topology)-1: topology[i][1] = len(self.dataset['training']['targets'].columns)
-                model.add(Dense(topology[i][1], input_dim=input, activation=topology[i][2]))
+                # if i == len(topology)-1:
+                #     topology[i][1] = len(self.dataset['training']['targets'].columns)
+                if topology[i][3] == 0: # Dense layer
+                    model.add(Dense(topology[i][1], input_dim=input, activation=topology[i][2]))
+                elif topology[i][3] == 1: # LSTM Layer
+                    model.add(LSTM(topology[0][1], input_dim=input, activation=topology[i][2]))
+                elif topology[i][3] == 2: # Convolutional layer
+                    model.add(Conv1D(topology[0][1], 5, input_dim=input, activation=topology[i][2]))
                 model.add(Dropout(topology[i][0]))
                 input = topology[i][1]
         model.compile(loss='mean_squared_error', optimizer=opti, metrics=['mae', 'accuracy'])
@@ -339,9 +345,14 @@ class neuralNet(object):
             else:
                 plt.show()
         # return metrics
+        
         if isnan(history.history['acc'][-1]) or isnan(history.history['val_loss'][-1]) or isnan(history.history['loss'][-1]):
-            return float(0.0)
-        return float(history.history['val_acc'][-1])
+            fitness =  float(0.0).copy()
+        fitness =  float(history.history['val_acc'][-1]).copy()
+        # clean
+        del hostory
+        K.clear_session()
+        return fitness
     
     def save_model(self, path=None):
         if path is None: path = self.log_path
@@ -432,24 +443,61 @@ class neuralNet(object):
                 ret[i] = int(round(ret[i]))
         return ret
     
+    def print_model(self, b, l, opti, top):
+                # Optimizer
+            if opti == 1: opti = "Adam"
+            elif opti == 2: opti = "SGD"
+            elif opti == 3: opti = "RMSprop"
+            elif opti == 4: opti = "Adagrad"
+            elif opti == 5: opti = "Adadelta"
+            elif opti == 6: opti = "Adamax"
+            elif opti == 7: opti = "Nadam"
+            
+            print "   Batch size........: %d"%b
+            print "   Learning rate.....: %.3f"%l
+            print "   Optimizer.........: %s"%opti
+            print "Layers:"
+            j = 0
+            for i, layer in enumerate(top):
+                # Get Activation function
+                if layer[2] == 0: 
+                    j = j + 1
+                else:
+                    if layer[2] == 1: layer[2] = 'relu'
+                    elif layer[2] == 2: layer[2] = 'softmax'
+                    elif layer[2] == 3: layer[2] = 'elu'
+                    elif layer[2] == 4: layer[2] = 'selu'
+                    elif layer[2] == 6: layer[2] = 'softsign'
+                    elif layer[2] == 7: layer[2] = 'tanh'
+                    elif layer[2] == 8: layer[2] = 'sigmoid'
+                    elif layer[2] == 9: layer[2] = 'hard_sigmoid'
+                    elif layer[2] == 10: layer[2] = 'linear'
+                    
+                    if layer[3] == 0: layer[3] = "Dense"
+                    elif layer[3] == 1: layer[3] = "LSTM"
+                    elif layer[3] == 2: layer[3] = "Conv1D"
+
+                    print "      %2d. dropout: %1.3f  Nodes: %3d  Activation: %12s  Type: %6s"%(i+1-j, layer[0], layer[1], layer[2], layer[3])
+        
     def convert_to_model(self, vector):
         batch = vector[0]
         lr = vector[1]
         opti = vector[2]
         topology = []
-        layer_num = (len(vector)-3)/3
+        layer_num = (len(vector)-3)/4
         for i in range(layer_num):
-            topology.append([vector[3+i*3], vector[3+i*3+1], vector[3+i*3+2]])
-            i = i + 3
+            topology.append([vector[3+i*4], vector[3+i*4+1], vector[3+i*4+2], vector[3+i*4+3]])
+            i = i + 4
         return batch, lr, opti, topology
     
     @profile
-    def fitness(self, individual, training_epochs, verbosity=0, title="Individual Fitness"):
-        print 'Fitness eval: ', training_epochs,"epochs"
-        print pd.Series(individual)
+    def fitness(self, individual, training_epochs, verbosity=0, title="Individual Fitness", v=False):
+        if v: print 'Fitness eval: ', training_epochs,"epochs"
         b, l, opti, top = self.convert_to_model(individual)
+        if v: self.print_model(b, l, opti, top)
         # create model
-        self.model_dense(b, l, opti, top)
+        self.set_model(b, l, opti, top)
+
         # train and evaluate
         return self.fit_model(epochs=training_epochs, log=False, verbose=verbosity, plot=1, title=title)
 
@@ -463,15 +511,14 @@ class neuralNet(object):
         print "Initializing population."
         if file is None:
             for i in range(0, population_size):
-                print "%2d/%2d"%(i+1,population_size),
+                print "%2d/%2d"%(i+1,population_size)
                 indv = []
                 for j in range(len(bounds)):
                     indv.append(random.uniform(bounds[j][0],bounds[j][1]))
                 indv = self.validate_individual(indv, bounds, float_index_list)
                 population.append(indv)
                 # calculate fitness
-                fitness_vec.append(self.fitness(indv, training_epochs, verbosity=1))
-                print "Fitness %.3f"%fitness_vec[-1] 
+                fitness_vec.append(self.fitness(indv, training_epochs, verbosity=1, v=True))
         else: # read from file but recalculate fitness (method might have changed)
             population = pd.read_csv(file)
             population.drop(population.columns[[0]], axis=1, inplace=True)
@@ -624,11 +671,11 @@ def main():
     # how to optimize a model with diferential evolutionary algoritm
     # if yo have no model, you first have to run the optimizer to determine the best topology and hiperparameters
     # run the code bellow, where bounds specify the search range and the max number for instance 5 layers
-    #         batch    learn_rate  opti   [dropout  nodes      activ]   [dropout  nodes      activ]   [dropout  nodes      activ]   [dropout  nodes      activ]   [dropout  nodes      activ] ... You can use as many as ou want as long as each layer has those 3 parameter   
-    bounds = [(5,50), (0.0001, 1), (1,7), (0, 0.5), (45, 600), (0, 10), (0, 0.5), (45, 600), (0, 10), (0, 0.5), (45, 600), (0, 10), (0, 0.5), (45, 600), (0, 10), (0, 0.5), (45, 600), (0, 10)]
+    #         batch    learn_rate  opti   [dropout  nodes      activ    type]  [dropout  nodes      activ    type]  [dropout  nodes      activ    type]  [dropout  nodes      activ    type]  [dropout  nodes      activ    type]  [dropout  nodes      activ    type] ... You can use as many as ou want as long as each layer has those 4 parameter   
+    bounds = [(5,50), (0.0001, 1), (1,7), (0, 0.5), (45, 600), (0, 10), (0,1), (0, 0.5), (45, 600), (0, 10), (0,1), (0, 0.5), (45, 600), (0, 10), (0,1), (0, 0.5), (45, 600), (0, 10), (0,1), (0, 0.5), (45, 600), (0, 10), (0,1), (0, 0.5), (45, 600), (0, 10), (0,1)]
     # some of the values in 'bound' have to be rounded since they are ony flags, so we have to pass a list of the lumbers that should not be rounded as bellow
     # indexes of which positions in bounds should NOT be integers
-    float_indexes = [1, 3, 6, 9, 12, 15, 18, 21, 24, 27, 30]
+    float_indexes = [1, 3, 7, 11, 15, 19, 23]
     # this is the actual algoritm call, it logs a 'population' file every iteration so if the training stops you can restart it by passing the file as argument
     # if you dont want to continue from where it stoped, just remove the 'file' argument]
     # in this file you can also se  your last population and use it as you will
@@ -647,7 +694,7 @@ def main():
     for layer in topo:
         print layer
     # Create model
-    handler.model_dense(batch=batch, learning_rate=lr, optimizer=opti, topology=topo)
+    handler.set_model(batch=batch, learning_rate=lr, optimizer=opti, topology=topo)
     # Here we will use a k-fold validation teqnique to trains and validade our model k times
     # Vector to keep accuracy over each iternation
     acc=[]
