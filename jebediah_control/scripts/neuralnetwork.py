@@ -275,26 +275,27 @@ class neuralNet(object):
             elif topology[i][2] == 8: topology[i][2] = 'sigmoid'
             elif topology[i][2] == 9: topology[i][2] = 'hard_sigmoid'
             elif topology[i][2] == 10: topology[i][2] = 'linear'
-        
-        self.model_name = "Deconvolutional"
-        model = Sequential()
+    
+        self.model_name = "NN"
         input = len(self.dataset['training']['labels'].columns)
+        n = len(topology)
         # [dropout layer_nodes activation layer_type]
-        for i in range(len(topology)):
-                if i == len(topology)-1: topology[i][1] = len(self.dataset['training']['targets'].columns) 
-                if topology[i][3] == 0: # Dense layer
-                    model.add(Dense(topology[i][1], input_dim=input, activation=topology[i][2])) 
-                elif topology[i][3] == 1: # LSTM Layer 
-                    model.add(LSTM(topology[0][1], input_dim=input, activation=topology[i][2])) 
-                elif topology[i][3] == 2: # Convolutional layer 
-                    model.add(Conv1D(topology[0][1], 5, input_dim=input, activation=topology[i][2])) 
-                model.add(Dropout(topology[i][0]))
-                input = topology[i][1]
+        model = Sequential()
+        for i, layer in enumerate(topology):
+                if i == n-1: layer[1] = len(self.dataset['training']['targets'].columns) 
+                print layer[3], type(layer[3])
+                if layer[3] == 0: # Dense layer
+                    model.add(Dense(layer[1], input_dim=input, activation=layer[2])) 
+                elif layer[3] == 1: # LTSM layer
+                    model.add(LSTM(layer[1], input_dim=input, activation=layer[2])) 
+                
+                model.add(Dropout(layer[0]))
+                input = layer[1]
         model.compile(loss='mean_squared_error', optimizer=opti, metrics=['mae', 'accuracy'])
         self.model = model
     
     @profile
-    def fit_model(self, epochs=5, plot=None, verbose=0, log=True, title="Model Fitting"):
+    def fit_model(self, epochs=5, plot=None, verbose=0, log=True, title="Model Fitting", clean=True):
         
         if log == True: # create log path
             log_path =  self.log_path + "/Tensor_logs/" + time.strftime('_%Y-%m-%d_%H-%M-%S')
@@ -307,13 +308,15 @@ class neuralNet(object):
         else:
             cb = []
         # fit model
-        history = self.model.fit( self.dataset['training']['labels'], 
-                        self.dataset['training']['targets'], 
+        history = self.model.fit(
+                        self.dataset['training']['labels'].values, 
+                        self.dataset['training']['targets'].values, 
                         epochs=epochs, 
                         batch_size=self.batch, 
                         callbacks=cb,
-                        validation_data=(   self.dataset['validation']['labels'], 
-                                            self.dataset['validation']['targets']),
+                        validation_data=(
+                            self.dataset['validation']['labels'].values, 
+                            self.dataset['validation']['targets'].values),
                         verbose = verbose)
         if plot is not None:
             plt.clf()
@@ -348,8 +351,9 @@ class neuralNet(object):
             fitness =  float(0.0).copy()
         fitness =  float(history.history['val_acc'][-1]).copy()
         # clean
-        del hostory
-        K.clear_session()
+        if clean:
+            del history
+            K.clear_session()
         return fitness
     
     def save_model(self, path=None):
@@ -442,42 +446,43 @@ class neuralNet(object):
         return ret
     
     def print_model(self, b, l, opti, top):
-                # Optimizer
-            if opti == 1: opti = "Adam"
-            elif opti == 2: opti = "SGD"
-            elif opti == 3: opti = "RMSprop"
-            elif opti == 4: opti = "Adagrad"
-            elif opti == 5: opti = "Adadelta"
-            elif opti == 6: opti = "Adamax"
-            elif opti == 7: opti = "Nadam"
-            
-            print "   Batch size........: %d"%b
-            print "   Learning rate.....: %.3f"%l
-            print "   Optimizer.........: %s"%opti
-            print "Layers:"
-            j = 0
-            for i, layer in enumerate(top):
-                # Get Activation function
-                if layer[2] == 0: 
-                    j = j + 1
-                else:
-                    if layer[2] == 1: layer[2] = 'relu'
-                    elif layer[2] == 2: layer[2] = 'softmax'
-                    elif layer[2] == 3: layer[2] = 'elu'
-                    elif layer[2] == 4: layer[2] = 'selu'
-                    elif layer[2] == 5: layer[2] = 'softplus'
-                    elif layer[2] == 6: layer[2] = 'softsign'
-                    elif layer[2] == 7: layer[2] = 'tanh'
-                    elif layer[2] == 8: layer[2] = 'sigmoid'
-                    elif layer[2] == 9: layer[2] = 'hard_sigmoid'
-                    elif layer[2] == 10: layer[2] = 'linear'
-                    
-                    if layer[3] == 0: layer[3] = "Dense"
-                    elif layer[3] == 1: layer[3] = "LSTM"
-                    elif layer[3] == 2: layer[3] = "Conv1D"
 
-                    print "      %2d. dropout: %1.3f  Nodes: %3d  Activation: %12s  Type: %6s"%(i+1-j, layer[0], layer[1], layer[2], layer[3])
+            # Optimizer
+        if opti == 1: opti_name = "Adam"
+        elif opti == 2: opti_name = "SGD"
+        elif opti == 3: opti_name = "RMSprop"
+        elif opti == 4: opti_name = "Adagrad"
+        elif opti == 5: opti_name = "Adadelta"
+        elif opti == 6: opti_name = "Adamax"
+        elif opti == 7: opti_name = "Nadam"
         
+        print "   Batch size........: %d"%b
+        print "   Learning rate.....: %.3f"%l
+        print "   Optimizer.........: %s"%opti_name
+        print "Layers:"
+        j = 0
+        for i, layer in enumerate(top):
+            # Get Activation function
+            if layer[2] == 0: 
+                j = j + 1
+            else:
+                if layer[2] == 1: activation = 'relu'
+                elif layer[2] == 2: activation = 'softmax'
+                elif layer[2] == 3: activation = 'elu'
+                elif layer[2] == 4: activation = 'selu'
+                elif layer[2] == 5: activation = 'softplus'
+                elif layer[2] == 6: activation = 'softsign'
+                elif layer[2] == 7: activation = 'tanh'
+                elif layer[2] == 8: activation = 'sigmoid'
+                elif layer[2] == 9: activation = 'hard_sigmoid'
+                elif layer[2] == 10: activation = 'linear'
+                
+                if layer[3] == 0: layer_type = "Dense"
+                elif layer[3] == 1: layer_type = "LSTM"
+                elif layer[3] == 2: layer_type = "Conv1D"
+
+                print "      %2d. dropout: %1.3f  Nodes: %3d  Activation: %12s  Type: %6s"%(i+1-j, layer[0], layer[1], activation, layer_type)
+
     def convert_to_model(self, vector):
         batch = vector[0]
         lr = vector[1]
