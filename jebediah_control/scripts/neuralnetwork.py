@@ -16,6 +16,7 @@ import pandas as pd
 import numpy as np
 import pickle
 from fourierseries import *
+from memory_profiler import profile
 
 def plot_corr_ellipses(data, ax=None, **kwargs):
 
@@ -70,6 +71,7 @@ class neuralNet(object):
         self.log_path = self.log_path + "/model"
         mkdir_p(self.log_path)
         random.seed(1)
+        np.random.seed(1)
     
     def Load_Data(self, file):
         """Get gait data from file
@@ -102,6 +104,7 @@ class neuralNet(object):
         scale = (max_val - min_val) / (max_scale - min_scale)
         return series.apply(lambda x:((x - min_val) / scale) - (max_scale - min_scale)/2)
 
+    # @profile
     def Preprocess(self):
         """Preprocess and syntesize data for neural net
         """
@@ -171,10 +174,19 @@ class neuralNet(object):
                 # remove action column
                 d.drop(name, axis=1, inplace=True)
             print "Chunk %3i/%3i processed."%(k+1,len(df_list))
-        self.data= pd.concat(df_list)
-        return self.data
+        
+        # cleanup
+        self.data.drop(self.data.columns, axis=1, inplace=True)
+        df.drop(df.columns, axis=1, inplace=True)
+        for d in df_list:
+            d.drop(df.columns, axis=1, inplace=True)
+            
+        # for i, n in enumerate(self.data.columns):
+        #     print i, n
+        self.data = pd.concat(df_list)
     
-    def Split(self, validation_proportion=0.30, target_numbers=12, randomize=False):
+    # @profile
+    def Split(self, validation_proportion=0.30, target_numbers=516, randomize=False, delete_original=True):
         """Split the class data into targets and labels for a validation and training and return a dictonary containing all 4 of the sets
         also keep a copy from it into the class.
         
@@ -210,6 +222,10 @@ class neuralNet(object):
         tra_targets = training.iloc[:,column_numbers-target_numbers:]
         val_labels = validation.iloc[:,0:column_numbers-target_numbers]
         val_targets = validation.iloc[:,column_numbers-target_numbers:]
+
+        if delete_original:
+            self.data.drop(self.data.columns, axis=1, inplace=True)
+
         self.dataset = {'training':{'labels':tra_labels, 'targets':tra_targets}, 'validation':{'labels':val_labels, 'targets':val_targets}}.copy()
         return self.dataset
     
@@ -271,15 +287,16 @@ class neuralNet(object):
         model.compile(loss='mean_squared_error', optimizer=opti, metrics=['mae', 'accuracy'])
         self.model = model
     
+    @profile
     def fit_model(self, epochs=5, plot=None, verbose=0, log=True, title="Model Fitting"):
         
         if log == True: # create log path
-            log_path =  self.log_path + "dense" + time.strftime('_%Y-%m-%d_%H-%M-%S')
+            log_path =  self.log_path + "/Tensor_logs/" + time.strftime('_%Y-%m-%d_%H-%M-%S')
             print "Logging to ", log_path
             mkdir_p(log_path)
             tensorboard = TensorBoard(log_dir=log_path)
             # log for tensorboard visualization
-            plot_model(self.model, to_file=log_path+'/model.png', show_shapes=True, show_layer_names=True)
+            plot_model(self.model, to_file=log_path+'/Tensor_logs/model.png', show_shapes=True, show_layer_names=True)
             cb = [tensorboard]
         else:
             cb = []
@@ -369,12 +386,14 @@ class neuralNet(object):
         self.model.predict(np.array([[1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1]]))
         print("Loaded model from disk")
 
+    @profile
     def model_eval(self):
         # evaluate the model
         scores = self.model.evaluate(self.dataset['validation']['labels'],self.dataset['validation']['targets'] , verbose=0)
         print("%s: %.2f%%" % (self.model.metrics_names[1], scores[1]*100))
         return scores[1]*100
     
+    @profile
     def predict(self, input):
         """Predict next step
         
@@ -422,13 +441,17 @@ class neuralNet(object):
             i = i + 3
         return batch, lr, opti, topology
     
+    @profile
     def fitness(self, individual, training_epochs, verbosity=0, title="Individual Fitness"):
+        print 'Fitness eval: ', training_epochs,"epochs"
+        print pd.Series(individual)
         b, l, opti, top = self.convert_to_model(individual)
         # create model
         self.model_dense(b, l, opti, top)
         # train and evaluate
         return self.fit_model(epochs=training_epochs, log=False, verbose=verbosity, plot=1, title=title)
 
+    @profile
     def differential_evolution(self, population_size, mutation_factor, crossover_factor, bounds, float_index_list, epochs, training_epochs=100, file=None):
         ### INITIALIZE POPULATION
         population = []
@@ -438,13 +461,15 @@ class neuralNet(object):
         print "Initializing population."
         if file is None:
             for i in range(0, population_size):
+                print "%2d/%2d"%(i+1,population_size),
                 indv = []
                 for j in range(len(bounds)):
                     indv.append(random.uniform(bounds[j][0],bounds[j][1]))
                 indv = self.validate_individual(indv, bounds, float_index_list)
                 population.append(indv)
                 # calculate fitness
-                fitness_vec.append(self.fitness(indv, training_epochs))
+                fitness_vec.append(self.fitness(indv, training_epochs, verbosity=1))
+                print "Fitness %.3f"%fitness_vec[-1] 
         else: # read from file but recalculate fitness (method might have changed)
             population = pd.read_csv(file)
             population.drop(population.columns[[0]], axis=1, inplace=True)
@@ -463,11 +488,11 @@ class neuralNet(object):
             temp.insert(0, 'Fitt', fitness_vec)
             print temp
             print temp.describe(percentiles=[])
-            temp.to_csv(self.log_path+'/population.csv', index=False)
+            temp.to_csv(self.log_path+'/Evolutionary_logs/population.csv', index=False)
             print "Epoch %3i time: %.2fmin"%(i,(time.time() - time_before)/60)
             print "="*120
             epoch_acc = epoch_acc.append({'Max':max(fitness_vec), 'mean':sum(fitness_vec)/len(fitness_vec), 'Min':min(fitness_vec)}, ignore_index=True)
-            epoch_acc.to_csv(self.log_path+'/LifeCycle.csv', index=False)
+            epoch_acc.to_csv(self.log_path+'/Evolutionary_logs/LifeCycle.csv', index=False)
             time_before = time.time()
             # For each individual
             for j in range(0, population_size):
@@ -520,12 +545,13 @@ class neuralNet(object):
         print "="*120
         time_before = time.time()
     
+    @profile
     def plot_lifecyle(self, path=None):
         if path is None:
-            lcl = pd.read_csv(self.log_path+"/LifeCycle.csv")
-            pop = pd.read_csv(self.log_path+"/population.csv")
+            lcl = pd.read_csv(self.log_path+'/Evolutionary_logs/LifeCycle.csv')
+            pop = pd.read_csv(self.log_path+"/Evolutionary_logs/population.csv")
         else:
-            lcl = pd.read_csv(path+"/LifeCycle.1.csv")
+            lcl = pd.read_csv(path+"/LifeCycle.csv")
             pop = pd.read_csv(path+"/population.csv")
         fig = plt.figure()
         plt.subplot2grid((2,2),(0, 0))
@@ -582,7 +608,6 @@ class neuralNet(object):
 
 # tensorboard --logdir logs/1
 def main():
-
     # How to load data
     # first you need to load the data to optimize then train the model
     # there is a smaller dataset for evolutionary puproses caled Dataset_evo.txt instide neuralnet/logs folder
@@ -590,24 +615,25 @@ def main():
     start_time = time.time()
     print "Started at %s"%time.strftime('_%Y-%m-%d_%H-%M-%S')
     handler = neuralNet()
+    handler.log_path = "/home/werner/catkin_ws/src/jcontrol/jebediah_control/scripts/model"
     handler.Load_Data(handler.log_path+"/Datasets/Dataset_evo.txt")
     handler.Preprocess()
-    return 0
     handler.Split()
     # how to optimize a model with diferential evolutionary algoritm
     # if yo have no model, you first have to run the optimizer to determine the best topology and hiperparameters
     # run the code bellow, where bounds specify the search range and the max number for instance 5 layers
-        #         batch     learn_rate   opti   [dropout  nodes    activ]   [dropout  nodes    activ]   [dropout  nodes    activ] ... You can use as many as ou want as long as each layer has those 3 parameter   
-        #bounds = [(0,100), (0.0001, 1), (1,7), (0, 0.5), (5, 35), (0, 10), (0, 0.5), (5, 35), (0, 10), (0, 0.5), (5, 35), (0, 10), (0, 0.5), (5, 35), (0, 10), (0, 0.5), (5, 35), (0, 10)]
-        # some of the values in 'bound' have to be rounded since they are ony flags, so we have to pass a list of the lumbers that should not be rounded as bellow
-        # indexes of which positions in bounds should NOT be integers
-        #float_indexes = [1, 3, 6, 9, 12, 15, 18, 21, 24, 27, 30]
-        # this plot the file LifeCycle of the evolutionary algorithm, this files is incremented at each generation even though the training is stoped for some reason
-        #handler.plot_lifecyle()
-        # this is the actual algoritm call, it logs a 'population' file every iteration so if the training stops you can restart it by passing the file as argument
-        # if you dont want to continue from where it stoped, just remove the 'file' argument]
-        # in this file you can also se  your last population and use it as you will
-        #handler.differential_evolution(10, 0.3, 0.4, bounds, float_indexes, 100, training_epochs = 20, file='logs/population.csv')
+    #         batch    learn_rate  opti   [dropout  nodes      activ]   [dropout  nodes      activ]   [dropout  nodes      activ]   [dropout  nodes      activ]   [dropout  nodes      activ] ... You can use as many as ou want as long as each layer has those 3 parameter   
+    bounds = [(5,50), (0.0001, 1), (1,7), (0, 0.5), (45, 600), (0, 10), (0, 0.5), (45, 600), (0, 10), (0, 0.5), (45, 600), (0, 10), (0, 0.5), (45, 600), (0, 10), (0, 0.5), (45, 600), (0, 10)]
+    # some of the values in 'bound' have to be rounded since they are ony flags, so we have to pass a list of the lumbers that should not be rounded as bellow
+    # indexes of which positions in bounds should NOT be integers
+    float_indexes = [1, 3, 6, 9, 12, 15, 18, 21, 24, 27, 30]
+    # this is the actual algoritm call, it logs a 'population' file every iteration so if the training stops you can restart it by passing the file as argument
+    # if you dont want to continue from where it stoped, just remove the 'file' argument]
+    # in this file you can also se  your last population and use it as you will
+    # Header: differential_evolution( population_size, mutation_factor, crossover_factor, bounds, float_index_list, epochs, training_epochs=100, file=None):            
+    handler.differential_evolution(5, 0.3, 0.4, bounds, float_indexes, 5, training_epochs = 3)#, file='logs/population.csv')
+    # this plot the file LifeCycle of the evolutionary algorithm, this files is incremented at each generation even though the training is stoped for some reason
+    handler.plot_lifecyle()
 
     # How to train a model
     # After having a good idea as to which model you should use, load the bigger dataset and run this fraction of code to train and save the model on a file
