@@ -178,9 +178,9 @@ class neuralNet(object):
                 # plot_fs(S,T,t, real = d[name].values)#, real_time = t0)
                 # remove action column
                 d.drop(name, axis=1, inplace=True)
+            print "Chunk %3i/%3i processed."%(k+1,len(df_list))
             # Add output as 2D image
             # df['Action_2D'] = image
-            # print "Chunk %3i/%3i processed."%(k+1,len(df_list))
             # rearange image to agrupate motors
             # image= np.array([
             #     image[0],
@@ -369,7 +369,8 @@ class neuralNet(object):
             # summarize history for loss
             plt.subplot(1,1,1)
             plt.plot(history.history['loss'])
-            if 'val_loss' in history.history.columns:
+            print history.history
+            if 'val_loss' in history.history:
                 plt.plot(history.history['val_loss'])
             plt.title('Loss')
             plt.ylabel('loss')
@@ -548,7 +549,6 @@ class neuralNet(object):
         # train and evaluate
         return fitness
 
-    @profile
     def differential_evolution(self, population_size, mutation_factor, crossover_factor, bounds, float_index_list, epochs, training_epochs=100, file=None):
         ### INITIALIZE POPULATION
         population = []
@@ -641,8 +641,7 @@ class neuralNet(object):
         print (time.time() - time_before)/60
         print "="*120
         time_before = time.time()
-    
-    @profile
+        
     def plot_lifecyle(self, path=None):
         if path is None:
             lcl = pd.read_csv(self.log_path+'/Evolutionary_logs/LifeCycle.csv')
@@ -712,27 +711,29 @@ def main():
     start_time = time.time()
     print "Started at %s"%time.strftime('_%Y-%m-%d_%H-%M-%S')
     handler = neuralNet()
-    handler.log_path = "/home/werner/catkin_ws/src/jcontrol/jebediah_control/scripts/model"
     handler.Load_Data(handler.log_path+"/Datasets/Dataset_evo.txt")
     handler.Preprocess()
-    handler.Split(delete_original=False)
+    handler.Split()
     # how to optimize a model with diferential evolutionary algoritm
     # if yo have no model, you first have to run the optimizer to determine the best topology and hiperparameters
     # run the code bellow, where bounds specify the search range and the max number for instance 5 layers
-    #         batch    learn_rate  opti   [dropout  nodes      activ    type]  [dropout  nodes      activ    type]  [dropout  nodes      activ    type]  [dropout  nodes      activ    type]  [dropout  nodes      activ    type]  [dropout  nodes      activ    type] ... You can use as many as ou want as long as each layer has those 4 parameter   
-    #bounds = [(5,50), (0.0001, 1), (1,7), (0, 0.5), (45, 600), (0, 10), (0,0), (0, 0.5), (45, 600), (0, 10), (0,0), (0, 0.5), (45, 600), (0, 10), (0,0), (0, 0.5), (45, 600), (0, 10), (0,0), (0, 0.5), (45, 600), (0, 10), (0,0), (0, 0.5), (45, 600), (0, 10), (0,0)]
+            # batch    learn_rate  opti   [dropout  nodes      activ    type]  [dropout  nodes      activ    type]  [dropout  nodes      activ    type]  [dropout  nodes      activ    type]  [dropout  nodes      activ    type]  [dropout  nodes      activ    type] ... You can use as many as ou want as long as each layer has those 4 parameter   
+    bounds = [(5,50), (0.0001, 1), (1,7), (0, 0.5), (45, 600), (0, 10), (0,0), (0, 0.5), (45, 600), (0, 10), (0,0), (0, 0.5), (45, 600), (0, 10), (0,0), (0, 0.5), (45, 600), (0, 10), (0,0), (0, 0.5), (45, 600), (0, 10), (0,0), (0, 0.5), (45, 600), (0, 10), (0,0)]
     # some of the values in 'bound' have to be rounded since they are ony flags, so we have to pass a list of the lumbers that should not be rounded as bellow
     # indexes of which positions in bounds should NOT be integers
-    #float_indexes = [1, 3, 7, 11, 15, 19, 23]
+    float_indexes = [1, 3, 7, 11, 15, 19, 23]
     # this is the actual algoritm call, it logs a 'population' file every iteration so if the training stops you can restart it by passing the file as argument
     # if you dont want to continue from where it stoped, just remove the 'file' argument]
     # in this file you can also se  your last population and use it as you will
     # Header: differential_evolution( population_size, mutation_factor, crossover_factor, bounds, float_index_list, epochs, training_epochs=100, file=None):            
-    #handler.differential_evolution(15, 0.3, 0.4, bounds, float_indexes, 20, training_epochs = 10)#, file='logs/population.csv')
+    handler.differential_evolution(15, 0.3, 0.4, bounds, float_indexes, 20, training_epochs = 10)#, file='logs/population.csv')
     # this plot the file LifeCycle of the evolutionary algorithm, this files is incremented at each generation even though the training is stoped for some reason
-    #handler.plot_lifecyle()
+    handler.plot_lifecyle()
 
     # How to train a model
+    handler.Load_Data(handler.log_path+"/Datasets/Dataset.txt")
+    handler.Preprocess()
+    handler.Split(validation_proportion=0.30, randomize=True, delete_original=False)
     # After having a good idea as to which model you should use, load the bigger dataset and run this fraction of code to train and save the model on a file
     # got this from optimization
     model_params = [30,0.6, 1, 0.01, 520, 9, 0, 0.01, 520, 9, 0, 0.01, 520, 9, 0, 0.01, 512, 9, 0]
@@ -752,7 +753,7 @@ def main():
         handler.Split(validation_proportion=0.30, randomize=True, delete_original=False)
         plot_title = "Model Training: %i"%k
         # train, plot and save value
-        fitness.append(handler.fit_model(epochs=5, plot=1, verbose=1, log=True, title=plot_title))
+        fitness.append(handler.fit_model(epochs=1, plot=1, verbose=1, log=True, title=plot_title))
         print ""
         print 'Model validation:'
         print 'Fitness:           ',fitness[-1]
