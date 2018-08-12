@@ -353,7 +353,6 @@ class neuralNet(object):
 
         # clean
         if clean:
-            print "Cleaning model from memory"
             del history
             del self.model
             K.clear_session()
@@ -498,7 +497,6 @@ class neuralNet(object):
             i = i + 4
         return batch, lr, opti, topology
     
-    @profile
     def fitness(self, individual, training_epochs, verbosity=0, title="Individual Fitness", v=False):
         if v: print 'Fitness eval: ', training_epochs,"epochs"
         b, l, opti, top = self.convert_to_model(individual)
@@ -508,8 +506,9 @@ class neuralNet(object):
         self.set_model(b, l, opti, top)
         loss_val, loss_tra = self.fit_model(epochs=training_epochs, log=False, verbose=verbosity, plot=1, title=title, clean=True)
         
-        fitness = (1-alpha)*loss_val + alpha*abs(loss_val - loss_tra)
-        print "Fitness: %.2f    Loss parcel: %.2f    Diff parcel: %.2f"%(fitness, (1-alpha)*loss_val, alpha*abs(loss_val - loss_tra))
+        #fitness = (1-alpha)*loss_val + alpha*abs(loss_val - loss_tra)
+        #print "Fitness: %.2f    Loss parcel: %.2f    Diff parcel: %.2f"%(fitness, (1-alpha)*loss_val, alpha*abs(loss_val - loss_tra))
+        fitness = loss_val + loss_tra
         # train and evaluate
         return fitness
 
