@@ -206,22 +206,22 @@ class neuralNet(object):
             # ["T", "a0", "a1", "a2", "a3", "a4", "a5", "a6", "a7", "a8", "a9", "a10", 
             # "b0","b1", "b2", "b3", "b4", "b5", "b6", "b7", "b8", "b9", "b10"])
 
-            plt.yticks(np.arange(12),[
-                "leg_1_coxa",
-                "leg_2_coxa",
-                "leg_3_coxa",
-                "leg_4_coxa",
-                "leg_1_femur",
-                "leg_2_femur",
-                "leg_3_femur",
-                "leg_4_femur",
-                "leg_1_tibia",
-                "leg_2_tibia",
-                "leg_3_tibia",
-                "leg_4_tibia",
-            ])
-            plt.imshow(image)
-            plt.show()
+            # plt.yticks(np.arange(12),[
+            #     "leg_1_coxa",
+            #     "leg_2_coxa",
+            #     "leg_3_coxa",
+            #     "leg_4_coxa",
+            #     "leg_1_femur",
+            #     "leg_2_femur",
+            #     "leg_3_femur",
+            #     "leg_4_femur",
+            #     "leg_1_tibia",
+            #     "leg_2_tibia",
+            #     "leg_3_tibia",
+            #     "leg_4_tibia",
+            # ])
+            # plt.imshow(image)
+            # plt.show()
         
         # cleanup
         self.data.drop(self.data.columns, axis=1, inplace=True)
