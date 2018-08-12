@@ -182,29 +182,29 @@ class neuralNet(object):
             # df['Action_2D'] = image
             # print "Chunk %3i/%3i processed."%(k+1,len(df_list))
             # rearange image to agrupate motors
-            image= np.array([
-                image[0],
-                image[3],
-                image[6],
-                image[9],
-                image[1],
-                image[4],
-                image[7],
-                image[10],
-                image[2],
-                image[5],
-                image[8],
-                image[11]
-            ])
-            # Show image
-            x_set = d["x_vel_set"].iloc[0]
-            y_set = d["y_vel_set"].iloc[0]
-            a_set = d["angular_vel_set"].iloc[0]
-            title = "Lin:(%.3f, %.3f) Ang: %.3f"%(x_set, y_set, a_set)
-            plt.title(title)
-            plt.xticks(np.arange(23),
-            ["T", "a0", "a1", "a2", "a3", "a4", "a5", "a6", "a7", "a8", "a9", "a10", 
-            "b0","b1", "b2", "b3", "b4", "b5", "b6", "b7", "b8", "b9", "b10"])
+            # image= np.array([
+            #     image[0],
+            #     image[3],
+            #     image[6],
+            #     image[9],
+            #     image[1],
+            #     image[4],
+            #     image[7],
+            #     image[10],
+            #     image[2],
+            #     image[5],
+            #     image[8],
+            #     image[11]
+            # ])
+            # # Show image
+            # x_set = d["x_vel_set"].iloc[0]
+            # y_set = d["y_vel_set"].iloc[0]
+            # a_set = d["angular_vel_set"].iloc[0]
+            # title = "Lin:(%.3f, %.3f) Ang: %.3f"%(x_set, y_set, a_set)
+            # plt.title(title)
+            # plt.xticks(np.arange(23),
+            # ["T", "a0", "a1", "a2", "a3", "a4", "a5", "a6", "a7", "a8", "a9", "a10", 
+            # "b0","b1", "b2", "b3", "b4", "b5", "b6", "b7", "b8", "b9", "b10"])
 
             plt.yticks(np.arange(12),[
                 "leg_1_coxa",
