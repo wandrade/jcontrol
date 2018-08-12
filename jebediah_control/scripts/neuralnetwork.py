@@ -501,14 +501,14 @@ class neuralNet(object):
         if v: print 'Fitness eval: ', training_epochs,"epochs"
         b, l, opti, top = self.convert_to_model(individual)
         if v: self.print_model(b, l, opti, top)
-        alpha = 0.5
+        alpha = 0.7
         # create model
         self.set_model(b, l, opti, top)
         loss_val, loss_tra = self.fit_model(epochs=training_epochs, log=False, verbose=verbosity, plot=1, title=title, clean=True)
         
         #fitness = (1-alpha)*loss_val + alpha*abs(loss_val - loss_tra)
         #print "Fitness: %.2f    Loss parcel: %.2f    Diff parcel: %.2f"%(fitness, (1-alpha)*loss_val, alpha*abs(loss_val - loss_tra))
-        fitness = loss_val + loss_tra
+        fitness = alpha*loss_val + (1-alpha)*loss_tra)
         # train and evaluate
         return fitness
 
@@ -692,7 +692,7 @@ def main():
     # if you dont want to continue from where it stoped, just remove the 'file' argument]
     # in this file you can also se  your last population and use it as you will
     # Header: differential_evolution( population_size, mutation_factor, crossover_factor, bounds, float_index_list, epochs, training_epochs=100, file=None):            
-    handler.differential_evolution(5, 0.3, 0.4, bounds, float_indexes, 2, training_epochs = 3)#, file='logs/population.csv')
+    handler.differential_evolution(15, 0.3, 0.4, bounds, float_indexes, 20, training_epochs = 10)#, file='logs/population.csv')
     # this plot the file LifeCycle of the evolutionary algorithm, this files is incremented at each generation even though the training is stoped for some reason
     handler.plot_lifecyle()
 
