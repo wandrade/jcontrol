@@ -508,7 +508,7 @@ class neuralNet(object):
         
         #fitness = (1-alpha)*loss_val + alpha*abs(loss_val - loss_tra)
         #print "Fitness: %.2f    Loss parcel: %.2f    Diff parcel: %.2f"%(fitness, (1-alpha)*loss_val, alpha*abs(loss_val - loss_tra))
-        fitness = alpha*loss_val + (1-alpha)*loss_tra)
+        fitness = alpha*loss_val + (1-alpha)*loss_tra
         # train and evaluate
         return fitness
 
