@@ -8,12 +8,14 @@ from keras.models import model_from_json
 from math import sqrt, isnan
 import matplotlib.pyplot as plt
 from matplotlib.collections import EllipseCollection
+
+import gc
 import time
 import os
 import errno
 import random
 import pandas as pd
-import numpy as np
+import numpy as np 
 import pickle
 from fourierseries import *
 from memory_profiler import profile
@@ -106,7 +108,6 @@ class neuralNet(object):
         scale = (max_val - min_val) / (max_scale - min_scale)
         return series.apply(lambda x:((x - min_val) / scale) - (max_scale - min_scale)/2)
 
-    # @profile
     def Preprocess(self):
         """Preprocess and syntesize data for neural net
         """
@@ -158,6 +159,7 @@ class neuralNet(object):
         N = 40
         for k,d in enumerate(df_list): # for each chunk of df
             n = d.shape[0]
+            image = []
             for i in range(12): # for each motor action in that chunk
                 name = "action_%i"%i
                 t = np.linspace(0, n*0.02, n, endpoint=False)
@@ -166,6 +168,7 @@ class neuralNet(object):
                 S, W = fourier_series_coeff(np.array([d[name].values,t]), T, N)
                 # Add values to df
                 array = ft_to_array(S, T)
+                image.append(array)
                 for j, f in enumerate(array):
                     d["act_%d_c%i"%(i,j)] = [f]*n
                 # Reconstruct S
@@ -175,7 +178,12 @@ class neuralNet(object):
                 # plot_fs(S,T,t, real = d[name].values)#, real_time = t0)
                 # remove action column
                 d.drop(name, axis=1, inplace=True)
-            print "Chunk %3i/%3i processed."%(k+1,len(df_list))
+            # Add output as 2D image
+            # df['Action_2D'] = image
+            # print "Chunk %3i/%3i processed."%(k+1,len(df_list))
+            # Show image
+            # plt.imshow(image)
+            # plt.show()
         
         # cleanup
         self.data.drop(self.data.columns, axis=1, inplace=True)
@@ -187,7 +195,6 @@ class neuralNet(object):
         #     print i, n
         self.data = pd.concat(df_list)
     
-    # @profile
     def Split(self, validation_proportion=0.30, target_numbers=516, randomize=False, delete_original=True):
         """Split the class data into targets and labels for a validation and training and return a dictonary containing all 4 of the sets
         also keep a copy from it into the class.
@@ -285,24 +292,25 @@ class neuralNet(object):
                 if i == n-1: layer[1] = len(self.dataset['training']['targets'].columns)
                 if layer[3] == 0: # Dense layer
                     model.add(Dense(layer[1], input_dim=input, activation=layer[2])) 
-                elif layer[3] == 1: # LTSM layer
-                    model.add(LSTM(layer[1], input_dim=input, activation=layer[2])) 
+                # elif layer[3] == 1: # Convolutional layer
+                #     model.add(Conv1D(layer[1], 2, activation=layer[]))
+                # elif layer[3] == 2: # LTSM layer
+                #     model.add(LSTM(layer[1], input_dim=input, activation=layer[2])) 
                 
                 model.add(Dropout(layer[0]))
                 input = layer[1]
-        model.compile(loss='mean_squared_error', optimizer=opti, metrics=['mae', 'accuracy'])
+        model.compile(loss='mean_squared_error', optimizer=opti, metrics=['mse'])
         self.model = model
     
-    @profile
-    def fit_model(self, epochs=5, plot=None, verbose=0, log=True, title="Model Fitting", clean=True):
+    def fit_model(self, epochs=5, plot=None, verbose=0, log=True, title="Model Fitting", clean=False):
         
         if log == True: # create log path
-            log_path =  self.log_path + "/Tensor_logs/" + time.strftime('_%Y-%m-%d_%H-%M-%S')
+            log_path =  self.log_path + "/Tensor_logs/" + time.strftime('%Y-%m-%d_%H-%M-%S')
             print "Logging to ", log_path
             mkdir_p(log_path)
             tensorboard = TensorBoard(log_dir=log_path)
             # log for tensorboard visualization
-            plot_model(self.model, to_file=log_path+'/Tensor_logs/model.png', show_shapes=True, show_layer_names=True)
+            plot_model(self.model, to_file=log_path+'/model.png', show_shapes=True, show_layer_names=True)
             cb = [tensorboard]
         else:
             cb = []
@@ -320,18 +328,9 @@ class neuralNet(object):
         if plot is not None:
             plt.clf()
             plt.suptitle(title)
-            # print(history.history.keys())
-            # summarize history for accuracy
-            plt.subplot(2,1,1)
-            plt.plot(history.history['acc'])
-            plt.plot(history.history['val_acc'])
-            plt.title('Accuracy')
-            plt.ylabel('accuracy')
-            plt.xlabel('epoch')
-            plt.grid()
 
             # summarize history for loss
-            plt.subplot(2,1,2)
+            plt.subplot(1,1,1)
             plt.plot(history.history['loss'])
             plt.plot(history.history['val_loss'])
             plt.title('Loss')
@@ -344,16 +343,22 @@ class neuralNet(object):
                 plt.pause(0.001)
             else:
                 plt.show()
+
         # return metrics
-        
-        if isnan(history.history['acc'][-1]) or isnan(history.history['val_loss'][-1]) or isnan(history.history['loss'][-1]):
-            fitness =  float(0.0)
-        fitness =  float(history.history['val_acc'][-1])
+        if isnan(history.history['loss'][-1]) or isnan(history.history['val_loss'][-1]) or isnan(history.history['loss'][-1]):
+            loss_tra =  float(0.0)
+            loss_val =  float(0.0)
+        loss_val = float(history.history['val_loss'][-1])
+        loss_tra = float(history.history['loss'][-1])
+
         # clean
         if clean:
+            print "Cleaning model from memory"
             del history
+            del self.model
             K.clear_session()
-        return fitness
+            gc.collect()        
+        return loss_val, loss_tra
     
     def save_model(self, path=None):
         if path is None: path = self.log_path
@@ -396,7 +401,7 @@ class neuralNet(object):
         elif self.optimizer == 7:
             opti = optimizers.Nadam(lr=self.learning_rate, beta_1=0.9, beta_2=0.999, epsilon=None, schedule_decay=0.004)
         # compile model
-        self.model.compile(loss='mean_squared_error', optimizer=opti, metrics=['mae', 'accuracy'])
+        self.model.compile(loss='mean_squared_error', optimizer=opti, metrics=['mse'])
         self.model.predict(np.array([[1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1]]))
         print("Loaded model from disk")
 
@@ -498,18 +503,22 @@ class neuralNet(object):
         if v: print 'Fitness eval: ', training_epochs,"epochs"
         b, l, opti, top = self.convert_to_model(individual)
         if v: self.print_model(b, l, opti, top)
+        alpha = 0.5
         # create model
         self.set_model(b, l, opti, top)
-
+        loss_val, loss_tra = self.fit_model(epochs=training_epochs, log=False, verbose=verbosity, plot=1, title=title, clean=True)
+        
+        fitness = (1-alpha)*loss_val + alpha*abs(loss_val - loss_tra)
+        print "Fitness: %.2f    Loss parcel: %.2f    Diff parcel: %.2f"%(fitness, (1-alpha)*loss_val, alpha*abs(loss_val - loss_tra))
         # train and evaluate
-        return self.fit_model(epochs=training_epochs, log=False, verbose=verbosity, plot=1, title=title)
+        return fitness
 
     @profile
     def differential_evolution(self, population_size, mutation_factor, crossover_factor, bounds, float_index_list, epochs, training_epochs=100, file=None):
         ### INITIALIZE POPULATION
         population = []
         fitness_vec = []
-        epoch_acc = pd.DataFrame(columns=['Max', 'mean', 'Min'])
+        epoch_fitness = pd.DataFrame(columns=['Max', 'mean', 'Min'])
         time_before = time.time()
         print "Initializing population."
         if file is None:
@@ -543,8 +552,8 @@ class neuralNet(object):
             temp.to_csv(self.log_path+'/Evolutionary_logs/population.csv', index=False)
             print "Epoch %3i time: %.2fmin"%(i,(time.time() - time_before)/60)
             print "="*120
-            epoch_acc = epoch_acc.append({'Max':max(fitness_vec), 'mean':sum(fitness_vec)/len(fitness_vec), 'Min':min(fitness_vec)}, ignore_index=True)
-            epoch_acc.to_csv(self.log_path+'/Evolutionary_logs/LifeCycle.csv', index=False)
+            epoch_fitness = epoch_fitness.append({'Max':max(fitness_vec), 'mean':sum(fitness_vec)/len(fitness_vec), 'Min':min(fitness_vec)}, ignore_index=True)
+            epoch_fitness.to_csv(self.log_path+'/Evolutionary_logs/LifeCycle.csv', index=False)
             time_before = time.time()
             # For each individual
             for j in range(0, population_size):
@@ -579,7 +588,8 @@ class neuralNet(object):
                 recombined_fit = self.fitness(recombined, training_epochs, title=Title)
                 print round(recombined_fit, 2), 
                 
-                if recombined_fit > fitness_vec[j]:
+                # minimize fitness
+                if recombined_fit < fitness_vec[j]:
                     fitness_vec[j] = recombined_fit
                     population[j] = recombined
                     print " Spawn survived."
@@ -612,9 +622,9 @@ class neuralNet(object):
         ax3 = plt.subplot2grid((2,2), (1,1), colspan=1)
         
         # Fitnss over time
-        ax1.set_title("Population accuracy on validation dataset")
+        ax1.set_title("Population fitness on validation dataset")
         ax1.set_xlabel("Epoch")
-        ax1.set_ylabel("Accuracy")
+        ax1.set_ylabel("Fitness")
         ax1.plot(lcl['Max'])
         ax1.plot(lcl['mean'])
         ax1.plot(lcl['Min'])
@@ -625,7 +635,7 @@ class neuralNet(object):
         # Correlation
         ax2.set_title("Correlation")
         corr_df = pop.copy()
-        corr_df = pd.DataFrame({'Accuracy':corr_df['Fitt'], 'Batch':corr_df['0'],'L.Rate':corr_df['1'], 'Optimizer':corr_df['2'],'Dropout':corr_df[['3', '6', '9', '12', '15']].mean(axis=1),'Nodes per layer':corr_df[['4', '7', '10', '13', '16']].mean(axis=1), 'Activation':corr_df[['5', '8', '11', '14', '17']].mean(axis=1)})
+        corr_df = pd.DataFrame({'Fitness':corr_df['Fitt'], 'Batch':corr_df['0'],'L.Rate':corr_df['1'], 'Optimizer':corr_df['2'],'Dropout':corr_df[['3', '6', '9', '12', '15']].mean(axis=1),'Nodes per layer':corr_df[['4', '7', '10', '13', '16']].mean(axis=1), 'Activation':corr_df[['5', '8', '11', '14', '17']].mean(axis=1)})
         corr = corr_df.corr() 
         m = plot_corr_ellipses(corr, ax=ax2)
         cb = fig.colorbar(m,ax=ax2)
@@ -683,67 +693,67 @@ def main():
     # if you dont want to continue from where it stoped, just remove the 'file' argument]
     # in this file you can also se  your last population and use it as you will
     # Header: differential_evolution( population_size, mutation_factor, crossover_factor, bounds, float_index_list, epochs, training_epochs=100, file=None):            
-    handler.differential_evolution(5, 0.3, 0.4, bounds, float_indexes, 5, training_epochs = 3)#, file='logs/population.csv')
+    handler.differential_evolution(5, 0.3, 0.4, bounds, float_indexes, 2, training_epochs = 3)#, file='logs/population.csv')
     # this plot the file LifeCycle of the evolutionary algorithm, this files is incremented at each generation even though the training is stoped for some reason
     handler.plot_lifecyle()
 
     # How to train a model
     # After having a good idea as to which model you should use, load the bigger dataset and run this fraction of code to train and save the model on a file
     # got this from optimization
-    model_params = [30,0.0005,1,0.14,29,6,0.06,27,1,0.01,20,6,0.14,23,4,0.11,33,4]
-    # Convert population string to parameters to create the model
-    batch, lr, opti, topo = handler.convert_to_model(model_params)
-    print 'Layers [dropout, nodes, activation function]:'
-    for layer in topo:
-        print layer
-    # Create model
-    handler.set_model(batch=batch, learning_rate=lr, optimizer=opti, topology=topo)
-    # Here we will use a k-fold validation teqnique to trains and validade our model k times
-    # Vector to keep accuracy over each iternation
-    acc=[]
-    mae=[]
-    for k in range (10):
-        st = time.time()
-        print '='*100
-        # resplit model randomly (instead of using only the end part of the data as above)
-        handler.Split(validation_proportion=0.30, randomize=True)
-        plot_title = "Model Training: %i"%k
-        # train, plot and save value
-        acc.append(100*handler.fit_model(epochs=70, plot=1, verbose=1, log=True, title=plot_title))
-        print ""
-        print 'Model validation:'
-        print 'Accuracy:           %.2f%%'%acc[-1]
-        mae.append(handler.model_eval())
-        time_spent = time.time()-st
-        print time_spent/(60*60)
-    print '-'*100
-    print "K-fold validation results:"
+    # model_params = [30,0.0005,1,0.14,29,6,0.06,27,1,0.01,20,6,0.14,23,4,0.11,33,4]
+    # # Convert population string to parameters to create the model
+    # batch, lr, opti, topo = handler.convert_to_model(model_params)
+    # print 'Layers [dropout, nodes, activation function]:'
+    # for layer in topo:
+    #     print layer
+    # # Create model
+    # handler.set_model(batch=batch, learning_rate=lr, optimizer=opti, topology=topo)
+    # # Here we will use a k-fold validation teqnique to trains and validade our model k times
+    # # Vector to keep fitness over each iternation
+    # fitness=[]
+    # mse=[]
+    # for k in range (10):
+    #     st = time.time()
+    #     print '='*100
+    #     # resplit model randomly (instead of using only the end part of the data as above)
+    #     handler.Split(validation_proportion=0.30, randomize=True)
+    #     plot_title = "Model Training: %i"%k
+    #     # train, plot and save value
+    #     fitness.append(100*handler.fit_model(epochs=70, plot=1, verbose=1, log=True, title=plot_title))
+    #     print ""
+    #     print 'Model validation:'
+    #     print 'Fitness:           %.2f%%'%fitness[-1]
+    #     mse.append(handler.model_eval())
+    #     time_spent = time.time()-st
+    #     print time_spent/(60*60)
+    # print '-'*100
+    # print "K-fold validation results:"
 
-    print 'Accuracy (%):'
-    acc = pd.Series(acc)
-    print acc
-    print acc.describe(percentiles=[])
+    # print 'Fitness (%):'
+    # fitness = pd.Series(fitness)
+    # print fitness
+    # print fitness.describe(percentiles=[])
 
-    print 'Mean Absolute Error (%):'
-    mae = pd.Series(mae)
-    print mae
-    print mae.describe(percentiles=[])
+    # print 'Mean Absolute Error (%):'
+    # mse = pd.Series(mse)
+    # print mse
+    # print mse.describe(percentiles=[])
 
-    # train final model with all data
-    print '-'*100
-    handler.Split(validation_proportion=0.001)
-    acc = handler.fit_model(epochs=70, plot=2, log=True, title='Model training', verbose=2)
-    print 'Accuracy: %.2f%%'%acc
-    # Evaluate model
-    handler.model_eval()
-    # save model to file:
-    handler.save_model()
+    # # train final model with all data
+    # print '-'*100
+    # handler.Split(validation_proportion=0.001)
+    # fitness = handler.fit_model(epochs=70, plot=2, log=True, title='Model training', verbose=2)
+    # print 'Fitness: %.2f%%'%fitness
+    # # Evaluate model
+    # handler.model_eval()
+    # # save model to file:
+    # handler.save_model()
 
-    end_time = time.time()
-    print ""
-    print "Finished at %s"%time.strftime('_%Y-%m-%d_%H-%M-%S')
-    total = end_time - start_time
-    print "Time consumption: %.2fh"%float(total/(60*60))
+    # end_time = time.time()
+    # print ""
+    # print "Finished at %s"%time.strftime('_%Y-%m-%d_%H-%M-%S')
+    # total = end_time - start_time
+    # print "Time consumption: %.2fh"%float(total/(60*60))
 
 if __name__ == '__main__':
        main()

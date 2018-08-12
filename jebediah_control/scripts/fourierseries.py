@@ -23,8 +23,7 @@ def timeit(method):
             name = kw.get('log_name', method.__name__.upper())
             kw['log_time'][name] = int((te - ts) * 1000)
         else:
-            print '%r  %2.3f ms' % \
-                  (method.__name__, (te - ts) * 1000)
+            print('%r  %2.3f ms' %(method.__name__, (te - ts) * 1000))
         return result
     return timed
 
@@ -172,7 +171,7 @@ def process_batch(df):
     # Calculate period (only needed for the first iteration)
         if i == 0: 
             T = get_period(s,t)
-        print T
+        print(T)
     
     # Calculate N fourier series coeficients
         S, W = fourier_series_coeff(np.array([s,t]), T, N, return_complex=True)
@@ -260,20 +259,20 @@ def main(args):
     pd.options.display.float_format = '{:.3f}'.format
 
     # File path
-    print 'Loading data frame'
+    print('Loading data frame')
     log_path = os.path.dirname(os.path.realpath(__file__))
     log_path = log_path + "/model/Datasets/Dataset_evo.txt"
     dataset = pd.read_csv(log_path, sep=' ')
 
-    print 'Separating chunks'
+    print('Separating chunks')
     dataset = get_chunk_list(dataset)
-    print 'Analysing...'
+    print('Analysing...')
     # loop
     for i, df in enumerate(dataset):
-        print "-"*150
-        print 'Set #%.3d'%i, 
-        print 'Len: ', df.shape
-        print df.iloc[0, :3]
+        print("-"*150)
+        print('Set #%.3d'%i, )
+        print('Len: ', df.shape)
+        print(df.iloc[0, :3])
         process_batch(df)
 if __name__ == '__main__':
     args = 0
