@@ -156,7 +156,7 @@ class neuralNet(object):
         # calculate actions output as fourrier transform and put it on the df
         df_list = get_chunk_list(df)
         # number of frequencies to aproximate fourrier series
-        N = 40
+        N = 20
         for k,d in enumerate(df_list): # for each chunk of df
             n = d.shape[0]
             image = []
@@ -167,23 +167,61 @@ class neuralNet(object):
                 T = get_period(d[name].values, t)
                 S, W = fourier_series_coeff(np.array([d[name].values,t]), T, N)
                 # Add values to df
-                array = ft_to_array(S, T)
+                array = ft_to_array(S, T, norm=True)
                 image.append(array)
                 for j, f in enumerate(array):
                     d["act_%d_c%i"%(i,j)] = [f]*n
                 # Reconstruct S
                 # t0 = t
                 # t = np.linspace(0, 2*n*0.02, 10*n, endpoint=False)
-                # S, T = array_to_ft(d.iloc[0,-(N+3):].values)
+                # S, T = array_to_ft(d.iloc[0,-(N+3):].values, norm=True)
                 # plot_fs(S,T,t, real = d[name].values)#, real_time = t0)
                 # remove action column
                 d.drop(name, axis=1, inplace=True)
             # Add output as 2D image
             # df['Action_2D'] = image
             # print "Chunk %3i/%3i processed."%(k+1,len(df_list))
+            # rearange image to agrupate motors
+            image= np.array([
+                image[0],
+                image[3],
+                image[6],
+                image[9],
+                image[1],
+                image[4],
+                image[7],
+                image[10],
+                image[2],
+                image[5],
+                image[8],
+                image[11]
+            ])
             # Show image
-            # plt.imshow(image)
-            # plt.show()
+            x_set = d["x_vel_set"].iloc[0]
+            y_set = d["y_vel_set"].iloc[0]
+            a_set = d["angular_vel_set"].iloc[0]
+            title = "Lin:(%.3f, %.3f) Ang: %.3f"%(x_set, y_set, a_set)
+            plt.title(title)
+            plt.xticks(np.arange(23),
+            ["T", "a0", "a1", "a2", "a3", "a4", "a5", "a6", "a7", "a8", "a9", "a10", 
+            "b0","b1", "b2", "b3", "b4", "b5", "b6", "b7", "b8", "b9", "b10"])
+
+            plt.yticks(np.arange(12),[
+                "leg_1_coxa",
+                "leg_2_coxa",
+                "leg_3_coxa",
+                "leg_4_coxa",
+                "leg_1_femur",
+                "leg_2_femur",
+                "leg_3_femur",
+                "leg_4_femur",
+                "leg_1_tibia",
+                "leg_2_tibia",
+                "leg_3_tibia",
+                "leg_4_tibia",
+            ])
+            plt.imshow(image)
+            plt.show()
         
         # cleanup
         self.data.drop(self.data.columns, axis=1, inplace=True)
@@ -194,7 +232,7 @@ class neuralNet(object):
         # for i, n in enumerate(self.data.columns):
         #     print i, n
         self.data = pd.concat(df_list)
-    
+
     def Split(self, validation_proportion=0.30, target_numbers=516, randomize=False, delete_original=True):
         """Split the class data into targets and labels for a validation and training and return a dictonary containing all 4 of the sets
         also keep a copy from it into the class.
@@ -206,7 +244,6 @@ class neuralNet(object):
         Returns:
             [Dictionary] -- [Containing a label 'training' and 'validation' each also containing a label 'labels' and 'targets' which are pandas datasets]
         """
-
         # Separate into training and validation
         validation_length = int(len(self.data)*validation_proportion)
         training_length = len(self.data) - validation_length
@@ -217,7 +254,7 @@ class neuralNet(object):
         
         if randomize is True:
             # get position where to starts cutting
-            random_portion = random.randint(0,len(self.data)-validation_length-1) # dont get tips for ease of implementation
+            random_portion = np.random.randint(0,len(self.data)-validation_length-1) # dont get tips for ease of implementation
             # Remove validation of dataset and save to training
             training = self.data.drop(self.data.index[random_portion:validation_length+random_portion])
             validation = self.data.drop(training.index)
@@ -332,7 +369,8 @@ class neuralNet(object):
             # summarize history for loss
             plt.subplot(1,1,1)
             plt.plot(history.history['loss'])
-            plt.plot(history.history['val_loss'])
+            if 'val_loss' in history.history.columns:
+                plt.plot(history.history['val_loss'])
             plt.title('Loss')
             plt.ylabel('loss')
             plt.xlabel('epoch')
@@ -404,14 +442,12 @@ class neuralNet(object):
         self.model.predict(np.array([[1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1]]))
         print("Loaded model from disk")
 
-    @profile
     def model_eval(self):
         # evaluate the model
         scores = self.model.evaluate(self.dataset['validation']['labels'],self.dataset['validation']['targets'] , verbose=0)
-        print("%s: %.2f%%" % (self.model.metrics_names[1], scores[1]*100))
-        return scores[1]*100
+        print("%s: %.2f%%" % (self.model.metrics_names[1], scores[1]))
+        return scores[1]
     
-    @profile
     def predict(self, input):
         """Predict next step
         
@@ -679,80 +715,79 @@ def main():
     handler.log_path = "/home/werner/catkin_ws/src/jcontrol/jebediah_control/scripts/model"
     handler.Load_Data(handler.log_path+"/Datasets/Dataset_evo.txt")
     handler.Preprocess()
-    handler.Split()
+    handler.Split(delete_original=False)
     # how to optimize a model with diferential evolutionary algoritm
     # if yo have no model, you first have to run the optimizer to determine the best topology and hiperparameters
     # run the code bellow, where bounds specify the search range and the max number for instance 5 layers
     #         batch    learn_rate  opti   [dropout  nodes      activ    type]  [dropout  nodes      activ    type]  [dropout  nodes      activ    type]  [dropout  nodes      activ    type]  [dropout  nodes      activ    type]  [dropout  nodes      activ    type] ... You can use as many as ou want as long as each layer has those 4 parameter   
-    bounds = [(5,50), (0.0001, 1), (1,7), (0, 0.5), (45, 600), (0, 10), (0,0), (0, 0.5), (45, 600), (0, 10), (0,0), (0, 0.5), (45, 600), (0, 10), (0,0), (0, 0.5), (45, 600), (0, 10), (0,0), (0, 0.5), (45, 600), (0, 10), (0,0), (0, 0.5), (45, 600), (0, 10), (0,0)]
+    #bounds = [(5,50), (0.0001, 1), (1,7), (0, 0.5), (45, 600), (0, 10), (0,0), (0, 0.5), (45, 600), (0, 10), (0,0), (0, 0.5), (45, 600), (0, 10), (0,0), (0, 0.5), (45, 600), (0, 10), (0,0), (0, 0.5), (45, 600), (0, 10), (0,0), (0, 0.5), (45, 600), (0, 10), (0,0)]
     # some of the values in 'bound' have to be rounded since they are ony flags, so we have to pass a list of the lumbers that should not be rounded as bellow
     # indexes of which positions in bounds should NOT be integers
-    float_indexes = [1, 3, 7, 11, 15, 19, 23]
+    #float_indexes = [1, 3, 7, 11, 15, 19, 23]
     # this is the actual algoritm call, it logs a 'population' file every iteration so if the training stops you can restart it by passing the file as argument
     # if you dont want to continue from where it stoped, just remove the 'file' argument]
     # in this file you can also se  your last population and use it as you will
     # Header: differential_evolution( population_size, mutation_factor, crossover_factor, bounds, float_index_list, epochs, training_epochs=100, file=None):            
-    handler.differential_evolution(15, 0.3, 0.4, bounds, float_indexes, 20, training_epochs = 10)#, file='logs/population.csv')
+    #handler.differential_evolution(15, 0.3, 0.4, bounds, float_indexes, 20, training_epochs = 10)#, file='logs/population.csv')
     # this plot the file LifeCycle of the evolutionary algorithm, this files is incremented at each generation even though the training is stoped for some reason
-    handler.plot_lifecyle()
+    #handler.plot_lifecyle()
 
     # How to train a model
     # After having a good idea as to which model you should use, load the bigger dataset and run this fraction of code to train and save the model on a file
     # got this from optimization
-    # model_params = [30,0.0005,1,0.14,29,6,0.06,27,1,0.01,20,6,0.14,23,4,0.11,33,4]
-    # # Convert population string to parameters to create the model
-    # batch, lr, opti, topo = handler.convert_to_model(model_params)
-    # print 'Layers [dropout, nodes, activation function]:'
-    # for layer in topo:
-    #     print layer
-    # # Create model
-    # handler.set_model(batch=batch, learning_rate=lr, optimizer=opti, topology=topo)
-    # # Here we will use a k-fold validation teqnique to trains and validade our model k times
-    # # Vector to keep fitness over each iternation
-    # fitness=[]
-    # mse=[]
-    # for k in range (10):
-    #     st = time.time()
-    #     print '='*100
-    #     # resplit model randomly (instead of using only the end part of the data as above)
-    #     handler.Split(validation_proportion=0.30, randomize=True)
-    #     plot_title = "Model Training: %i"%k
-    #     # train, plot and save value
-    #     fitness.append(100*handler.fit_model(epochs=70, plot=1, verbose=1, log=True, title=plot_title))
-    #     print ""
-    #     print 'Model validation:'
-    #     print 'Fitness:           %.2f%%'%fitness[-1]
-    #     mse.append(handler.model_eval())
-    #     time_spent = time.time()-st
-    #     print time_spent/(60*60)
-    # print '-'*100
-    # print "K-fold validation results:"
+    model_params = [30,0.6, 1, 0.01, 520, 9, 0, 0.01, 520, 9, 0, 0.01, 520, 9, 0, 0.01, 512, 9, 0]
+    # Convert population string to parameters to create the model
+    batch, lr, opti, topo = handler.convert_to_model(model_params)
+    handler.print_model(batch, lr, opti, topo)
+    # Create model
+    handler.set_model(batch=batch, learning_rate=lr, optimizer=opti, topology=topo)
+    # Here we will use a k-fold validation teqnique to trains and validade our model k times
+    # Vector to keep fitness over each iternation
+    fitness=[]
+    mse=[]
+    for k in range (10):
+        st = time.time()
+        print '='*100
+        # resplit model randomly (instead of using only the end part of the data as above)
+        handler.Split(validation_proportion=0.30, randomize=True, delete_original=False)
+        plot_title = "Model Training: %i"%k
+        # train, plot and save value
+        fitness.append(handler.fit_model(epochs=5, plot=1, verbose=1, log=True, title=plot_title))
+        print ""
+        print 'Model validation:'
+        print 'Fitness:           ',fitness[-1]
+        mse.append(handler.model_eval())
+        time_spent = time.time()-st
+        print time_spent/(60*60)
+    print '-'*100
+    print "K-fold validation results:"
 
-    # print 'Fitness (%):'
-    # fitness = pd.Series(fitness)
-    # print fitness
-    # print fitness.describe(percentiles=[])
+    print 'Fitness (%):'
+    fitness = pd.Series(fitness)
+    print fitness
+    print fitness.describe(percentiles=[])
 
-    # print 'Mean Absolute Error (%):'
-    # mse = pd.Series(mse)
-    # print mse
-    # print mse.describe(percentiles=[])
+    print 'Mean Absolute Error (%):'
+    mse = pd.Series(mse)
+    print mse
+    print mse.describe(percentiles=[])
 
-    # # train final model with all data
-    # print '-'*100
-    # handler.Split(validation_proportion=0.001)
-    # fitness = handler.fit_model(epochs=70, plot=2, log=True, title='Model training', verbose=2)
-    # print 'Fitness: %.2f%%'%fitness
-    # # Evaluate model
-    # handler.model_eval()
-    # # save model to file:
-    # handler.save_model()
+    print "Final error: %.1f +- %.1f"%(np.sqrt(mse.mean()), sqrt(mse.std()))
+    # train final model with all data
+    print '-'*100
+    handler.Split(validation_proportion=0.001)
+    fitness = handler.fit_model(epochs=10, plot=2, log=True, title='Model training', verbose=2)
+    print 'Fitness: %.2f%%'%fitness
+    # Evaluate model
+    handler.model_eval()
+    # save model to file:
+    handler.save_model()
 
-    # end_time = time.time()
-    # print ""
-    # print "Finished at %s"%time.strftime('_%Y-%m-%d_%H-%M-%S')
-    # total = end_time - start_time
-    # print "Time consumption: %.2fh"%float(total/(60*60))
+    end_time = time.time()
+    print ""
+    print "Finished at %s"%time.strftime('_%Y-%m-%d_%H-%M-%S')
+    total = end_time - start_time
+    print "Time consumption: %.2fh"%float(total/(60*60))
 
 if __name__ == '__main__':
        main()

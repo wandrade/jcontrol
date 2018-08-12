@@ -48,14 +48,17 @@ def interpolate(t, pairs):
     except Exception as e:
         return closest
 
-def ft_to_array(ft, T):
+def ft_to_array(ft, T, norm=False):
     #separate imag from real
     series = np.concatenate((ft.real, ft.imag))
-    return np.concatenate((np.array([T]), series))
+    if norm: series[0] = series[0]/10
+    array = np.concatenate((np.array([T]), series))
+    return array
 
-def array_to_ft(array):
+def array_to_ft(array, norm=False):
     T = array[0]
     real = array[1:1+len(array)/2]
+    if norm: real[0] = real[0]/10
     imag = array[1+len(array)/2:]
     S = real + imag*1j
     return S, T    
