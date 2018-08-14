@@ -7,7 +7,7 @@ import neuralnetwork
 import time
 from math import *
 import numpy as np
-
+from fourierseries import array_to_ft, eval_rfft
 def timeit(method):
     """Time decorator, this can be used to measure the function elapesd time without interfering on its funcionality
     To use it, put the following decorator befor any function:
@@ -48,6 +48,7 @@ class jcontroller:
     set_point_angular_velocity = 1.08
     action_publisher = None
     state = None
+    prev_actions = [2]*12
     def __init__(self):
         rospy.init_node('jebediah_controler')
         # Create reset service
@@ -72,16 +73,14 @@ class jcontroller:
         self.state = cb_state
         if self.control:
             # Calculate error
-            error = [
-                cb_state.Twist.linear.x - self.set_point_linear_velocity[0],
-                cb_state.Twist.linear.y - self.set_point_linear_velocity[1],
-                cb_state.IMU.angular_velocity.z - self.set_point_angular_velocity
-            ] 
+            error = np.sqrt((cb_state.Twist.linear.x - self.set_point_linear_velocity[0])**2 + (cb_state.Twist.linear.y - self.set_point_linear_velocity[1])**2 + (cb_state.IMU.angular_velocity.z - self.set_point_angular_velocity)**2)
+            print error
             # Create eval vector
-            eval_vector = np.array([[
+            eval_vector = [
                 self.set_point_linear_velocity[0],
                 self.set_point_linear_velocity[1],
                 self.set_point_angular_velocity,
+                error,
                 amap(cb_state.Angles[0], -90, 90, -1, 1),
                 amap(cb_state.Angles[1], -90, 90, -1, 1),
                 amap(cb_state.Angles[2], -90, 90, -1, 1),
@@ -111,18 +110,22 @@ class jcontroller:
                 cb_state.Twist.linear.x,
                 cb_state.Twist.linear.y,
                 cb_state.Twist.linear.z
-            ]])
+            ]
+            eval_vector.extend(self.prev_actions)
+            eval_vector = np.array([eval_vector])
             # Eval next step
-            action = self.nn.predict(eval_vector)[0].tolist()
+            fs = self.nn.predict(eval_vector)[0].tolist()
+            fs, T = array_to_ft(fs, norm=True)
+            action = eval_rfft(fs, time.time(), T)
+            print action,type(action)
             # map from -1 1 to radians
-            action = [amap(alpha, -1, 1, -1.57079, 1.57079) for alpha in action]
+            # action = [amap(alpha, -1, 1, -1.57079, 1.57079) for alpha in action]
             # Publish action
             self.set_joints(action)
             # verbose
             # print error
             # print action
             
-
     def get_state(self):
         return self.state
 
@@ -203,4 +206,4 @@ def main(args):
         pass
 
 if __name__ == '__main__':
-   main()
+   main(None)

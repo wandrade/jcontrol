@@ -68,7 +68,7 @@ def amap(x, in_min, in_max, out_min, out_max):
 
 class neuralNet(object):
     def __init__(self, *args):
-        pd.options.display.max_rows = 12
+        pd.options.display.max_rows = 15
         pd.options.display.float_format = '{:.2f}'.format
         self.log_path = os.path.dirname(os.path.realpath(__file__))
         self.log_path = self.log_path + "/model"
@@ -236,7 +236,7 @@ class neuralNet(object):
         #     print i, n
         self.data = pd.concat(df_list)
 
-    def Split(self, validation_proportion=0.30, target_numbers=516, randomize=False, delete_original=True):
+    def Split(self, validation_proportion=0.30, target_numbers=276, randomize=False, delete_original=True):
         """Split the class data into targets and labels for a validation and training and return a dictonary containing all 4 of the sets
         also keep a copy from it into the class.
         
@@ -276,6 +276,7 @@ class neuralNet(object):
             self.data.drop(self.data.columns, axis=1, inplace=True)
 
         self.dataset = {'training':{'labels':tra_labels, 'targets':tra_targets}, 'validation':{'labels':val_labels, 'targets':val_targets}}.copy()
+        
         return self.dataset
     
     def set_model(self, batch = 50, learning_rate=0.01, optimizer = 2, topology = [[0, 24, 1, 1],[0, 24, 0, 1],[0.1, 24, 1, 1],[0, 24, 1, 1],[0, 12, 1, 1]]):
@@ -713,24 +714,24 @@ def main():
     start_time = time.time()
     print "Started at %s"%time.strftime('_%Y-%m-%d_%H-%M-%S')
     handler = neuralNet()
-    # handler.Load_Data(handler.log_path+"/Datasets/Dataset_evo.txt")
-    # handler.Preprocess()
-    # handler.Split()
+    handler.Load_Data(handler.log_path+"/Datasets/Dataset_evo.txt")
+    handler.Preprocess()
+    handler.Split()
     # # how to optimize a model with diferential evolutionary algoritm
     # # if yo have no model, you first have to run the optimizer to determine the best topology and hiperparameters
     # # run the code bellow, where bounds specify the search range and the max number for instance 5 layers
     #         # batch    learn_rate  opti   [dropout  nodes      activ    type]  [dropout  nodes      activ    type]  [dropout  nodes      activ    type]  [dropout  nodes      activ    type]  [dropout  nodes      activ    type]  [dropout  nodes      activ    type] ... You can use as many as ou want as long as each layer has those 4 parameter   
-    # bounds = [(5,50), (0.0001, 1), (1,7), (0, 0.5), (45, 600), (0, 10), (0,0), (0, 0.5), (45, 600), (0, 10), (0,0), (0, 0.5), (45, 600), (0, 10), (0,0), (0, 0.5), (45, 600), (0, 10), (0,0), (0, 0.5), (45, 600), (0, 10), (0,0), (0, 0.5), (45, 600), (0, 10), (0,0)]
+    bounds = [(5,50), (0.0001, 1), (1,7), (0, 0.5), (45, 600), (0, 10), (0,0), (0, 0.5), (45, 600), (0, 10), (0,0), (0, 0.5), (45, 600), (0, 10), (0,0), (0, 0.5), (45, 600), (0, 10), (0,0), (0, 0.5), (45, 600), (0, 10), (0,0), (0, 0.5), (45, 600), (0, 10), (0,0)]
     # # some of the values in 'bound' have to be rounded since they are ony flags, so we have to pass a list of the lumbers that should not be rounded as bellow
     # # indexes of which positions in bounds should NOT be integers
-    # float_indexes = [1, 3, 7, 11, 15, 19, 23]
+    float_indexes = [1, 3, 7, 11, 15, 19, 23]
     # # this is the actual algoritm call, it logs a 'population' file every iteration so if the training stops you can restart it by passing the file as argument
     # # if you dont want to continue from where it stoped, just remove the 'file' argument]
     # # in this file you can also se  your last population and use it as you will
     # # Header: differential_evolution( population_size, mutation_factor, crossover_factor, bounds, float_index_list, epochs, training_epochs=100, file=None):            
-    # handler.differential_evolution(15, 0.3, 0.4, bounds, float_indexes, 20, training_epochs = 10)#, file='logs/population.csv')
+    handler.differential_evolution(5, 0.3, 0.4, bounds, float_indexes, 5, training_epochs = 5)#, file='logs/population.csv')
     # # this plot the file LifeCycle of the evolutionary algorithm, this files is incremented at each generation even though the training is stoped for some reason
-    # handler.plot_lifecyle()
+    handler.plot_lifecyle()
 
     # How to train a model
     handler.Load_Data(handler.log_path+"/Datasets/Dataset.txt")
