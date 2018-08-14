@@ -68,7 +68,7 @@ def amap(x, in_min, in_max, out_min, out_max):
 
 class neuralNet(object):
     def __init__(self, *args):
-        pd.options.display.max_rows = 15
+        pd.options.display.max_rows = 20
         pd.options.display.float_format = '{:.2f}'.format
         self.log_path = os.path.dirname(os.path.realpath(__file__))
         self.log_path = self.log_path + "/model"
@@ -558,8 +558,8 @@ class neuralNet(object):
         fitness_vec = []
         epoch_fitness = pd.DataFrame(columns=['Max', 'mean', 'Min'])
         time_before = time.time()
-        print "Initializing population."
         if file is None:
+            print "Initializing random population."
             for i in range(0, population_size):
                 print "%2d/%2d"%(i+1,population_size)
                 indv = []
@@ -570,13 +570,11 @@ class neuralNet(object):
                 # calculate fitness
                 fitness_vec.append(self.fitness(indv, training_epochs, verbosity=1, v=True))
         else: # read from file but recalculate fitness (method might have changed)
+            print 'Loading population from file'
             population = pd.read_csv(file)
+            fitness_vec = population['Fitt'].values.tolist()
             population.drop(population.columns[[0]], axis=1, inplace=True)
             population = population.values.tolist()
-            print population
-            for indv in population:
-                indv = self.validate_individual(indv, bounds, float_index_list)
-                fitness_vec.append(self.fitness(indv, training_epochs))
             
         ### Evolutionary loop
         # For each epoch
@@ -585,7 +583,7 @@ class neuralNet(object):
             # and log to file for later use if need be
             temp = pd.DataFrame(population)
             temp.insert(0, 'Fitt', fitness_vec)
-            print temp
+            print temp.sort_values(['Fitt'], ascending=True)
             print temp.describe(percentiles=[])
             temp.to_csv(self.log_path+'/Evolutionary_logs/population.csv', index=False)
             print "Epoch %3i time: %.2fmin"%(i,(time.time() - time_before)/60)
@@ -638,12 +636,13 @@ class neuralNet(object):
         # and log to file for later use if need be
         temp = pd.DataFrame(population)
         temp.insert(0, 'Fitt', fitness_vec)
-        print temp
+        print temp.sort_values(['Fitt'], ascending=True)
         print temp.describe(percentiles=[])
         temp.to_csv(self.log_path+'/population.csv', index=False)
         print (time.time() - time_before)/60
         print "="*120
         time_before = time.time()
+        return temp.sort_values(['Fitt'], ascending=True).iloc[0].tolist()[1:]
         
     def plot_lifecyle(self, path=None):
         if path is None:
@@ -705,8 +704,13 @@ class neuralNet(object):
         ax3.set_xlabel("Search range")
         plt.show()
 
+    
 # tensorboard --logdir logs/1
 def main():
+    training_epochs = 5
+    evolutio_epochs = 10
+    evolutio_popula = 30
+    k_fold_val_runs = 10
     # How to load data
     # first you need to load the data to optimize then train the model
     # there is a smaller dataset for evolutionary puproses caled Dataset_evo.txt instide neuralnet/logs folder
@@ -720,43 +724,57 @@ def main():
     # # how to optimize a model with diferential evolutionary algoritm
     # # if yo have no model, you first have to run the optimizer to determine the best topology and hiperparameters
     # # run the code bellow, where bounds specify the search range and the max number for instance 5 layers
-    #         # batch    learn_rate  opti   [dropout  nodes      activ    type]  [dropout  nodes      activ    type]  [dropout  nodes      activ    type]  [dropout  nodes      activ    type]  [dropout  nodes      activ    type]  [dropout  nodes      activ    type] ... You can use as many as ou want as long as each layer has those 4 parameter   
-    bounds = [(5,50), (0.0001, 1), (1,7), (0, 0.5), (45, 600), (0, 10), (0,0), (0, 0.5), (45, 600), (0, 10), (0,0), (0, 0.5), (45, 600), (0, 10), (0,0), (0, 0.5), (45, 600), (0, 10), (0,0), (0, 0.5), (45, 600), (0, 10), (0,0), (0, 0.5), (45, 600), (0, 10), (0,0)]
+    #         # batch    learn_rate  opti
+    #    dropout   nodes      activ   type
+    bounds = [(5,50), (0.0001, 1), (1,7),
+        (0, 0.5), (45, 600), (0, 10), (0,0), 
+        (0, 0.5), (45, 600), (0, 10), (0,0), 
+        (0, 0.5), (45, 600), (0, 10), (0,0), 
+        (0, 0.5), (45, 600), (0, 10), (0,0), 
+        (0, 0.5), (45, 600), (0, 10), (0,0), 
+        (0, 0.5), (45, 600), (0, 10), (0,0), 
+        (0, 0.5), (45, 600), (0, 10), (0,0), 
+        (0, 0.5), (45, 600), (0, 10), (0,0), 
+        (0, 0.5), (45, 600), (0, 10), (0,0), 
+        (0, 0.5), (45, 600), (0, 10), (0,0)]
     # # some of the values in 'bound' have to be rounded since they are ony flags, so we have to pass a list of the lumbers that should not be rounded as bellow
     # # indexes of which positions in bounds should NOT be integers
-    float_indexes = [1, 3, 7, 11, 15, 19, 23]
+    float_indexes = [1, 3, 7, 11, 15, 19, 23, 27, 31, 35, 39]
     # # this is the actual algoritm call, it logs a 'population' file every iteration so if the training stops you can restart it by passing the file as argument
     # # if you dont want to continue from where it stoped, just remove the 'file' argument]
     # # in this file you can also se  your last population and use it as you will
     # # Header: differential_evolution( population_size, mutation_factor, crossover_factor, bounds, float_index_list, epochs, training_epochs=100, file=None):            
-    handler.differential_evolution(5, 0.3, 0.4, bounds, float_indexes, 5, training_epochs = 5)#, file='logs/population.csv')
+    model_params = handler.differential_evolution(evolutio_popula, 0.3, 0.4, bounds, float_indexes, evolutio_epochs, training_epochs = training_epochs)#, file=handler.log_path+'/Evolutionary_logs/population.csv')
+    # Convert population string to parameters to create the model
+    batch, lr, opti, topo = handler.convert_to_model(model_params)
+    print model_params
+    handler.print_model(batch, lr, opti, topo)
+    print '=*'*50
     # # this plot the file LifeCycle of the evolutionary algorithm, this files is incremented at each generation even though the training is stoped for some reason
-    handler.plot_lifecyle()
+    #handler.plot_lifecyle()
 
     # How to train a model
+    print 'Loading full dataset for k-fold validation'
     handler.Load_Data(handler.log_path+"/Datasets/Dataset.txt")
     handler.Preprocess()
     handler.Split(validation_proportion=0.30, randomize=True, delete_original=False)
     # After having a good idea as to which model you should use, load the bigger dataset and run this fraction of code to train and save the model on a file
     # got this from optimization
-    model_params = [34,0.3, 5, 0.0, 600, 5, 0, 0.15, 108, 6, 0, 0.1, 444, 4, 0, 0.4, 540, 1, 0, 0.07, 451, 6, 0, 0, 45, 10, 0]
-    # Convert population string to parameters to create the model
-    batch, lr, opti, topo = handler.convert_to_model(model_params)
-    handler.print_model(batch, lr, opti, topo)
+    # model_params = [34,0.3, 5, 0.0, 600, 5, 0, 0.15, 108, 6, 0, 0.1, 444, 4, 0, 0.4, 540, 1, 0, 0.07, 451, 6, 0, 0, 45, 10, 0]
     # Create model
     handler.set_model(batch=batch, learning_rate=lr, optimizer=opti, topology=topo)
     # Here we will use a k-fold validation teqnique to trains and validade our model k times
     # Vector to keep fitness over each iternation
     fitness=[]
     mse=[]
-    for k in range (10):
+    for k in range (k_fold_val_runs):
         st = time.time()
         print '='*100
         # resplit model randomly (instead of using only the end part of the data as above)
         handler.Split(validation_proportion=0.30, randomize=True, delete_original=False)
         plot_title = "Model Training: %i"%k
         # train, plot and save value
-        fitness.append(handler.fit_model(epochs=10, plot=1, verbose=1, log=True, title=plot_title))
+        fitness.append(handler.fit_model(epochs=training_epochs, plot=1, verbose=1, log=True, title=plot_title))
         print ""
         print 'Model validation:'
         mse.append(handler.model_eval())
@@ -774,7 +792,7 @@ def main():
     # train final model with all data
     print '-'*100
     handler.Split(validation_proportion=0.001)
-    fitness = handler.fit_model(epochs=10, plot=1, log=True, title='Model training', verbose=2)
+    fitness = handler.fit_model(epochs=training_epochs, plot=1, log=True, title='Model training', verbose=2)
     # Evaluate model
     handler.model_eval()
     # save model to file:
