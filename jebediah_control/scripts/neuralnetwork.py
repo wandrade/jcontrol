@@ -17,6 +17,7 @@ import random
 import pandas as pd
 import numpy as np 
 import pickle
+import sys
 from fourierseries import *
 from memory_profiler import profile
 
@@ -178,7 +179,9 @@ class neuralNet(object):
                 # plot_fs(S,T,t, real = d[name].values)#, real_time = t0)
                 # remove action column
                 d.drop(name, axis=1, inplace=True)
-            print "Chunk %3i/%3i processed."%(k+1,len(df_list))
+            for i in range(100):
+                sys.stdout.write('\r')
+            print "Chunk %3i/%3i processed."%(k+1,len(df_list)),
             # Add output as 2D image
             # df['Action_2D'] = image
             # rearange image to agrupate motors
@@ -222,7 +225,7 @@ class neuralNet(object):
             # ])
             # plt.imshow(image)
             # plt.show()
-        
+        print ""
         # cleanup
         self.data.drop(self.data.columns, axis=1, inplace=True)
         df.drop(df.columns, axis=1, inplace=True)
@@ -735,7 +738,7 @@ def main():
     handler.Split(validation_proportion=0.30, randomize=True, delete_original=False)
     # After having a good idea as to which model you should use, load the bigger dataset and run this fraction of code to train and save the model on a file
     # got this from optimization
-    model_params = [34,0.6, 5, 0.0, 600, 5, 0, 0.15, 108, 6, 0, 0.1, 444, 4, 0, 0.4, 540, 1, 0, 0.07, 451, 6, 0, 0, 45, 10, 0]
+    model_params = [34,0.3, 5, 0.0, 600, 5, 0, 0.15, 108, 6, 0, 0.1, 444, 4, 0, 0.4, 540, 1, 0, 0.07, 451, 6, 0, 0, 45, 10, 0]
     # Convert population string to parameters to create the model
     batch, lr, opti, topo = handler.convert_to_model(model_params)
     handler.print_model(batch, lr, opti, topo)
@@ -752,22 +755,16 @@ def main():
         handler.Split(validation_proportion=0.30, randomize=True, delete_original=False)
         plot_title = "Model Training: %i"%k
         # train, plot and save value
-        fitness.append(handler.fit_model(epochs=1, plot=1, verbose=1, log=True, title=plot_title))
+        fitness.append(handler.fit_model(epochs=10, plot=1, verbose=1, log=True, title=plot_title))
         print ""
         print 'Model validation:'
-        print 'Fitness:           ',fitness[-1]
         mse.append(handler.model_eval())
         time_spent = time.time()-st
-        print time_spent/(60*60)
+        print "%.2fh"%float(time_spent/(60*60))
     print '-'*100
     print "K-fold validation results:"
 
-    print 'Fitness (%):'
-    fitness = pd.Series(fitness)
-    print fitness
-    print fitness.describe(percentiles=[])
-
-    print 'Mean Absolute Error (%):'
+    print 'Mean Absolute Error:'
     mse = pd.Series(mse)
     print mse
     print mse.describe(percentiles=[])
@@ -776,8 +773,7 @@ def main():
     # train final model with all data
     print '-'*100
     handler.Split(validation_proportion=0.001)
-    fitness = handler.fit_model(epochs=10, plot=2, log=True, title='Model training', verbose=2)
-    print 'Fitness: %.2f%%'%fitness
+    fitness = handler.fit_model(epochs=10, plot=1, log=True, title='Model training', verbose=2)
     # Evaluate model
     handler.model_eval()
     # save model to file:
@@ -788,6 +784,7 @@ def main():
     print "Finished at %s"%time.strftime('_%Y-%m-%d_%H-%M-%S')
     total = end_time - start_time
     print "Time consumption: %.2fh"%float(total/(60*60))
+    plt.show()
 
 if __name__ == '__main__':
        main()

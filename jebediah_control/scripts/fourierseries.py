@@ -245,7 +245,8 @@ def get_chunk_list(df):
     # Separate each dataframe into other 2 dataframes, 1 with the 30 first steps and the other with the rest
     df_list = []
     for g in groups:
-        df_list.append(g.iloc[:30])
+        # Uncomment next line to add transition step
+        # df_list.append(g.iloc[:30])
         df_list.append(g.iloc[30:])
     # Remove uneeded data
     for d in df_list:
