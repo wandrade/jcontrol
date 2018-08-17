@@ -5,7 +5,7 @@ from jcontrol_msgs.msg import State, Action
 from std_srvs.srv import Empty
 import neuralnetwork
 import time
-from math import pow
+from math import pow, radians
 import numpy as np
 from fourierseries import array_to_ft, eval_rfft
 def timeit(method):

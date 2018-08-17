@@ -39,8 +39,9 @@ def joinLists(a, b, steps = 30):
 
 def run():
     j.set_joints([0,0,0,0,0,0,0,0,0,0,0,0], mode='deg')
-    f = open('Dataset.txt', 'w')
-    for iterations in range(100):
+    f = open('Dataset.csv', 'w')
+    f.write("x_vel_set,y_vel_set,angular_vel_set,action_0,action_1,action_2,action_3,action_4,action_5,action_6,action_7,action_8,action_9,action_10,action_11")
+    for iterations in range(2):
         currentgait = []
         angList = []
         actions = []
@@ -49,12 +50,12 @@ def run():
         # (direction, walkDistance, bh, plot, steps)
         while True:
             if randint(0,1):
-                cmd = "ang = GenerateAngularGait(%d, %f, 0.08, 0, %d)"%(randint(0,1), uniform(0.1, 0.11), randint(60, 150))
+                cmd = "ang = GenerateAngularGait(%d, %f, 0.08, 0, %d)"%(randint(0,1), uniform(0.1, 0.11), randint(60, 200))
             else:
-                cmd =        "ang = GenerateGait(%d, %f, 0.08, 0, %d)"%(randint(0,3), uniform(0.1, 0.11), randint(60, 150))
+                cmd =        "ang = GenerateGait(%d, %f, 0.08, 0, %d)"%(randint(0,3), uniform(0.1, 0.11), randint(60, 200))
             try:
-                print matSess.run(cmd)
-                print iterations, ": " , cmd
+                matSess.run(cmd)
+                print iterations, ": " , cmd,
                 break
             except:
                 pass
@@ -90,28 +91,25 @@ def run():
         aVel = round(np.mean([s.IMU.angular_velocity.z for s in states][31:-1]),3)
         # write to file
         #header
-        print ""
-        print ("x_vel_set y_vel_set angular_vel_set motor_state_0 motor_state_1 motor_state_2 motor_state_3 motor_state_4 motor_state_5 motor_state_6 motor_state_7 motor_state_8 motor_state_9 motor_state_10 motor_state_11 ground_colision_0 ground_colision_1 ground_colision_2 ground_colision_3 orientation_quaternion_x orientation_quaternion_y orientation_quaternion_z orientation_quaternion_w angular_vel_x angular_vel_y angular_vel_z linear_acceleration_x linear_acceleration_y linear_acceleration_z linear_velocity_x linear_velocity_y linear_velocity_z action_0 action_1 action_2 action_3 action_4 action_5 action_6 action_7 action_8 action_9 action_10 action_11")
-        print ""
         for i in range(len(actions)):
             ### INPUTS
             # setpoints
-            line = "%f %f %f "%(xVel, yVel, aVel)
+            line = "%f,%f,%f,"%(xVel, yVel, aVel)
             # motors States
-            line = line + "%f %f %f %f %f %f %f %f %f %f %f %f "%(states[i].Angles[0], states[i].Angles[1], states[i].Angles[2], states[i].Angles[3], states[i].Angles[4], states[i].Angles[5], states[i].Angles[6], states[i].Angles[7], states[i].Angles[8], states[i].Angles[9], states[i].Angles[10], states[i].Angles[11])
-            # collision
-            line = line + "%d %d %d %d "%(states[i].Ground_Collision[0], states[i].Ground_Collision[1], states[i].Ground_Collision[2], states[i].Ground_Collision[3])
-            # IMU - mag - orientation
-            line = line + "%f %f %f %f "%(states[i].IMU.orientation.x, states[i].IMU.orientation.y, states[i].IMU.orientation.z, states[i].IMU.orientation.w)
-            # IMU - gyro
-            line = line + "%f %f %f "%(states[i].IMU.angular_velocity.x, states[i].IMU.angular_velocity.y, states[i].IMU.angular_velocity.z)
-            # IMU - accel
-            line = line + "%f %f %f "%(states[i].IMU.linear_acceleration.x, states[i].IMU.linear_acceleration.y, states[i].IMU.linear_acceleration.z)
-            # velocities
-            line = line + "%f %f %f "%(states[i].Twist.linear.x, states[i].Twist.linear.y, states[i].Twist.angular.z)
-            ### OUTPUTS
+            # line = line + "%f %f %f %f %f %f %f %f %f %f %f %f "%(states[i].Angles[0], states[i].Angles[1], states[i].Angles[2], states[i].Angles[3], states[i].Angles[4], states[i].Angles[5], states[i].Angles[6], states[i].Angles[7], states[i].Angles[8], states[i].Angles[9], states[i].Angles[10], states[i].Angles[11])
+            # # collision
+            # line = line + "%d %d %d %d "%(states[i].Ground_Collision[0], states[i].Ground_Collision[1], states[i].Ground_Collision[2], states[i].Ground_Collision[3])
+            # # IMU - mag - orientation
+            # line = line + "%f %f %f %f "%(states[i].IMU.orientation.x, states[i].IMU.orientation.y, states[i].IMU.orientation.z, states[i].IMU.orientation.w)
+            # # IMU - gyro
+            # line = line + "%f %f %f "%(states[i].IMU.angular_velocity.x, states[i].IMU.angular_velocity.y, states[i].IMU.angular_velocity.z)
+            # # IMU - accel
+            # line = line + "%f %f %f "%(states[i].IMU.linear_acceleration.x, states[i].IMU.linear_acceleration.y, states[i].IMU.linear_acceleration.z)
+            # # velocities
+            # line = line + "%f %f %f "%(states[i].Twist.linear.x, states[i].Twist.linear.y, states[i].Twist.angular.z)
+            # ### OUTPUTS
             # Action
-            line = line + "%f %f %f %f %f %f %f %f %f %f %f %f"%(actions[i][0], actions[i][1], actions[i][2], actions[i][3], actions[i][4], actions[i][5], actions[i][6], actions[i][7], actions[i][8], actions[i][9], actions[i][10], actions[i][11])
+            line = line + "%f,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f"%(actions[i][0], actions[i][1], actions[i][2], actions[i][3], actions[i][4], actions[i][5], actions[i][6], actions[i][7], actions[i][8], actions[i][9], actions[i][10], actions[i][11])
             ### WRITE
             f.write('%s\n' % line)
         print xVel, yVel, aVel;
