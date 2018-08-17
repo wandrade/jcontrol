@@ -112,6 +112,7 @@ class neuralNet(object):
     def Preprocess(self):
         """Preprocess and syntesize data for neural net
         """
+        print "Preprocessing data"
         df = self.data
         # x_vel_set y_vel_set angular_vel_set motor_state_0 motor_state_1 motor_state_2 motor_state_3 motor_state_4 motor_state_5 motor_state_6 motor_state_7 motor_state_8 motor_state_9 motor_state_10 motor_state_11 ground_colision_0 ground_colision_1 ground_colision_2 ground_colision_3 orientation_quaternion_x orientation_quaternion_y orientation_quaternion_z orientation_quaternion_w angular_vel_x angular_vel_y angular_vel_z linear_acceleration_x linear_acceleration_y linear_acceleration_z linear_velocity_x linear_velocity_y linear_velocity_z action_0 action_1 action_2 action_3 action_4 action_5 action_6 action_7 action_8 action_9 action_10 action_11
      # SINTETIC DATA
@@ -137,7 +138,8 @@ class neuralNet(object):
         for i in range(12):
             name = "action_%i"%i    
             delayed_name = "act_delayed_%i"%i
-            df[delayed_name] = df[name].shift(1)
+            # df = df.assign(delayed_name=df.loc[:,name].shift(1))
+            df[delayed_name] = pd.Series(df.loc[:,name].values).shift(1)
         df.fillna(0, inplace=True)
 
         # put actions lats
