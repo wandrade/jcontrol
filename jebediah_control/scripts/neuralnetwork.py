@@ -638,7 +638,7 @@ class neuralNet(object):
         temp.insert(0, 'Fitt', fitness_vec)
         print temp.sort_values(['Fitt'], ascending=True)
         print temp.describe(percentiles=[])
-        temp.to_csv(self.log_path+'/population.csv', index=False)
+        temp.to_csv(self.log_path+'/Evolutionary_logs/population.csv', index=False)
         print (time.time() - time_before)/60
         print "="*120
         time_before = time.time()
@@ -744,7 +744,7 @@ def main():
     # # if you dont want to continue from where it stoped, just remove the 'file' argument]
     # # in this file you can also se  your last population and use it as you will
     # # Header: differential_evolution( population_size, mutation_factor, crossover_factor, bounds, float_index_list, epochs, training_epochs=100, file=None):            
-    model_params = handler.differential_evolution(evolutio_popula, 0.3, 0.4, bounds, float_indexes, evolutio_epochs, training_epochs = training_epochs)#, file=handler.log_path+'/Evolutionary_logs/population.csv')
+    model_params = handler.differential_evolution(evolutio_popula, 0.3, 0.4, bounds, float_indexes, evolutio_epochs, training_epochs = training_epochs, file=handler.log_path+'/Evolutionary_logs/population.csv')
     # Convert population string to parameters to create the model
     batch, lr, opti, topo = handler.convert_to_model(model_params)
     print model_params
