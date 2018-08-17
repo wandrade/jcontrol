@@ -38,10 +38,13 @@ def joinLists(a, b, steps = 30):
     return c + b
 
 def run():
+    st = time.time()
     j.set_joints([0,0,0,0,0,0,0,0,0,0,0,0], mode='deg')
     f = open('Dataset.csv', 'w')
-    f.write("x_vel_set,y_vel_set,angular_vel_set,action_0,action_1,action_2,action_3,action_4,action_5,action_6,action_7,action_8,action_9,action_10,action_11")
-    for iterations in range(2):
+    f.write("x_vel_set,y_vel_set,angular_vel_set,action_0,action_1,action_2,action_3,action_4,action_5,action_6,action_7,action_8,action_9,action_10,action_11\n")
+    
+    total_iter = 1000
+    for iterations in range(total_iter):
         currentgait = []
         angList = []
         actions = []
@@ -55,7 +58,9 @@ def run():
                 cmd =        "ang = GenerateGait(%d, %f, 0.08, 0, %d)"%(randint(0,3), uniform(0.1, 0.11), randint(60, 200))
             try:
                 matSess.run(cmd)
-                print iterations, ": " , cmd,
+                # remaining = 
+                print "%3d/%3d:"%(iterations+1,total_iter), 
+                print "%40s - "%cmd,
                 break
             except:
                 pass
@@ -112,6 +117,7 @@ def run():
             line = line + "%f,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f"%(actions[i][0], actions[i][1], actions[i][2], actions[i][3], actions[i][4], actions[i][5], actions[i][6], actions[i][7], actions[i][8], actions[i][9], actions[i][10], actions[i][11])
             ### WRITE
             f.write('%s\n' % line)
+        print (time.time() - st)/(1+iterations),
         print xVel, yVel, aVel;
         
 run()
