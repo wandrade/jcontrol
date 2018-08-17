@@ -8,7 +8,7 @@ from keras.models import model_from_json
 from math import sqrt, isnan
 import matplotlib.pyplot as plt
 from matplotlib.collections import EllipseCollection
-
+import os.path
 import gc
 import time
 import os
@@ -85,7 +85,7 @@ class neuralNet(object):
             file {string} -- path to file
         """
 
-        self.data = pd.read_csv(file, sep=' ')
+        self.data = pd.read_csv(file)
         # print self.data
     
     def linear_scale(self, series, min_scale=-1, max_scale=1, min_val=None, max_val=None):
@@ -109,62 +109,26 @@ class neuralNet(object):
         scale = (max_val - min_val) / (max_scale - min_scale)
         return series.apply(lambda x:((x - min_val) / scale) - (max_scale - min_scale)/2)
 
-    def Preprocess(self):
+    def process_raw_data(self, path=None):
         """Preprocess and syntesize data for neural net
         """
-        print "Preprocessing data"
-        df = self.data
-        # x_vel_set y_vel_set angular_vel_set motor_state_0 motor_state_1 motor_state_2 motor_state_3 motor_state_4 motor_state_5 motor_state_6 motor_state_7 motor_state_8 motor_state_9 motor_state_10 motor_state_11 ground_colision_0 ground_colision_1 ground_colision_2 ground_colision_3 orientation_quaternion_x orientation_quaternion_y orientation_quaternion_z orientation_quaternion_w angular_vel_x angular_vel_y angular_vel_z linear_acceleration_x linear_acceleration_y linear_acceleration_z linear_velocity_x linear_velocity_y linear_velocity_z action_0 action_1 action_2 action_3 action_4 action_5 action_6 action_7 action_8 action_9 action_10 action_11
-     # SINTETIC DATA
+        print "Loading file: ",
+        if path is None:
+            path = self.log_path + "/Datasets/Dataset.csv"
+        print path
+        df = pd.read_csv(path)
+        print "processing data"
+        # SINTETIC DATA
             # Inputs will be:
                 # Setpoints
-                # Current error
-                # Robot state
-                # Current velocities
-                # Last actions
-
-        # error module vector, where the vector is a 3D vecotr of x an y and angular velocities
-        x_err = df["x_vel_set"]-df["linear_velocity_x"]
-        y_err = df["y_vel_set"]-df["linear_velocity_y"]
-        w_err = df["angular_vel_set"]-df["angular_vel_z"]
-        df["error"] = np.sqrt(x_err**2 + y_err**2 + w_err**2)
-        
+                # Current error module
+                
+        # empty error vector
+        df["error"] = 0
         # put error column after setpoints
         cols = df.columns.tolist()
         cols = cols[:3] + [cols[-1]] + cols[3:-1]
         df = df[cols]
-        # Drop all uninportant data
-        drop_vec = ['motor_state_0', 
-            'motor_state_1', 
-            'motor_state_2', 
-            'motor_state_3', 
-            'motor_state_4', 
-            'motor_state_5', 
-            'motor_state_6', 
-            'motor_state_7', 
-            'motor_state_8', 
-            'motor_state_9', 
-            'motor_state_10', 
-            'motor_state_11', 
-            'ground_colision_0', 
-            'ground_colision_1', 
-            'ground_colision_2', 
-            'ground_colision_3', 
-            'orientation_quaternion_x', 
-            'orientation_quaternion_y', 
-            'orientation_quaternion_z', 
-            'orientation_quaternion_w', 
-            'angular_vel_x', 
-            'angular_vel_y', 
-            'angular_vel_z', 
-            'linear_acceleration_x', 
-            'linear_acceleration_y', 
-            'linear_acceleration_z', 
-            'linear_velocity_x', 
-            'linear_velocity_y', 
-            'linear_velocity_z']
-        df.drop(drop_vec, axis=1, inplace=True)
-        df.drop_duplicates(inplace=True)
      # FOURIER
         # calculate actions output as fourrier transform and put it on the df
         df_list = get_chunk_list(df)
@@ -187,7 +151,8 @@ class neuralNet(object):
                 # remove action column
                 d.drop(name, axis=1, inplace=True)
                 # Remove repeated values
-                print d.head(15) 
+            # print d.drop(np.arange(1,d.shape[0])) 
+            d.drop(d.index.values[1:], inplace=True)
             for i in range(100):
                 sys.stdout.write('\r')
             print "Chunk %3i/%3i processed."%(k+1,len(df_list)),
@@ -235,15 +200,19 @@ class neuralNet(object):
             # plt.imshow(image)
             # plt.show()
         print ""
-        # cleanup
-        self.data.drop(self.data.columns, axis=1, inplace=True)
-        df.drop(df.columns, axis=1, inplace=True)
-        for d in df_list:
-            d.drop(df.columns, axis=1, inplace=True)
-
-        self.data = pd.concat(df_list)
-        print self.data
-
+        processed_data = pd.concat(df_list)
+        
+        output = self.log_path + "/Datasets/Dataset_processed.csv"
+        
+        # check if there is already a processed dataset
+        if os.path.isfile(output):
+            d = pd.read_csv(self.log_path + "/Datasets/Dataset_processed.csv")
+            # if there iss, append to processed data
+            processed_data = pd.concat([processed_data, d])
+        processed_data = processed_data.round(6)
+        processed_data.drop_duplicates(inplace=True)
+        processed_data.to_csv(self.log_path + "/Datasets/Dataset_processed.csv" , index=False)
+        
     def Split(self, validation_proportion=0.30, target_numbers=276, randomize=False, delete_original=True):
         """Split the class data into targets and labels for a validation and training and return a dictonary containing all 4 of the sets
         also keep a copy from it into the class.
@@ -422,7 +391,7 @@ class neuralNet(object):
             pickle.dump([self.optimizer, self.learning_rate], opti_file)
         print("Saved model to disk")
 
-    def load_model(self, path=None, inputs=45):
+    def load_model(self, path=None, inputs=4):
         if path is None: path = self.log_path
         # load json and create model
         json_file = open(path+"/model_topology.json", 'r')
@@ -774,8 +743,8 @@ def main():
 
     # How to train a model
     print 'Loading full dataset for k-fold validation'
-    handler.Load_Data(handler.log_path+"/Datasets/Dataset.txt")
-    handler.Preprocess()
+    handler.process_raw_data()
+    handler.Load_Data(handler.log_path+"/Datasets/Dataset_processed.csv")
     handler.Split(validation_proportion=0.20)#, randomize=True, delete_original=False)
     # After having a good idea as to which model you should use, load the bigger dataset and run this fraction of code to train and save the model on a file
     # got this from optimization
