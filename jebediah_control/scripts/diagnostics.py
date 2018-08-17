@@ -1,3 +1,4 @@
+#! /usr/bin/env python
 import rospy
 import matplotlib
 import matplotlib.pyplot as plt

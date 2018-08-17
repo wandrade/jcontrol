@@ -5,7 +5,7 @@ from jcontrol_msgs.msg import State, Action
 from std_srvs.srv import Empty
 import neuralnetwork
 import time
-from math import *
+from math import pow
 import numpy as np
 from fourierseries import array_to_ft, eval_rfft
 def timeit(method):
@@ -44,8 +44,8 @@ def amap(x, in_min, in_max, out_min, out_max):
     return (x - in_min) * (out_max - out_min) / (in_max - in_min) + out_min
 
 class jcontroller:
-    set_point_linear_velocity = [0.08, 1.08]
-    set_point_angular_velocity = 1.08
+    set_point_linear_velocity = [0.081, -0.002]
+    set_point_angular_velocity = 0.001
     action_publisher = None
     state = None
     prev_actions = [2]*12
@@ -74,50 +74,24 @@ class jcontroller:
         if self.control:
             # Calculate error
             error = np.sqrt((cb_state.Twist.linear.x - self.set_point_linear_velocity[0])**2 + (cb_state.Twist.linear.y - self.set_point_linear_velocity[1])**2 + (cb_state.IMU.angular_velocity.z - self.set_point_angular_velocity)**2)
-            print error
+            # print error
             # Create eval vector
             eval_vector = [
                 self.set_point_linear_velocity[0],
                 self.set_point_linear_velocity[1],
                 self.set_point_angular_velocity,
-                error,
-                amap(cb_state.Angles[0], -90, 90, -1, 1),
-                amap(cb_state.Angles[1], -90, 90, -1, 1),
-                amap(cb_state.Angles[2], -90, 90, -1, 1),
-                amap(cb_state.Angles[3], -90, 90, -1, 1),
-                amap(cb_state.Angles[4], -90, 90, -1, 1),
-                amap(cb_state.Angles[5], -90, 90, -1, 1),
-                amap(cb_state.Angles[6], -90, 90, -1, 1),
-                amap(cb_state.Angles[7], -90, 90, -1, 1),
-                amap(cb_state.Angles[8], -90, 90, -1, 1),
-                amap(cb_state.Angles[9], -90, 90, -1, 1),
-                amap(cb_state.Angles[10], -90, 90, -1, 1),
-                amap(cb_state.Angles[11], -90, 90, -1, 1),
-                cb_state.Ground_Collision[0],
-                cb_state.Ground_Collision[1],
-                cb_state.Ground_Collision[2],
-                cb_state.Ground_Collision[3],
-                cb_state.IMU.orientation.x,
-                cb_state.IMU.orientation.y,
-                cb_state.IMU.orientation.z,
-                cb_state.IMU.orientation.w,
-                cb_state.IMU.angular_velocity.x,
-                cb_state.IMU.angular_velocity.y,
-                cb_state.IMU.angular_velocity.z,
-                cb_state.IMU.linear_acceleration.x,
-                cb_state.IMU.linear_acceleration.y,
-                cb_state.IMU.linear_acceleration.z,
-                cb_state.Twist.linear.x,
-                cb_state.Twist.linear.y,
-                cb_state.Twist.linear.z
+                error
             ]
-            eval_vector.extend(self.prev_actions)
             eval_vector = np.array([eval_vector])
             # Eval next step
-            fs = self.nn.predict(eval_vector)[0].tolist()
-            fs, T = array_to_ft(fs, norm=True)
-            action = eval_rfft(fs, time.time(), T)
-            print action,type(action)
+            fs = self.nn.predict(eval_vector)[0]
+            # Split array in 12 chuncks of N values and evaluate FS
+            N = 23 
+            action = []
+            for i in range(12):
+                motor_fs = fs[i*N:i*N+N]
+                motor_fs, T = array_to_ft(motor_fs, norm=True)
+                action.append(eval_rfft(motor_fs, time.time(), T))
             # map from -1 1 to radians
             # action = [amap(alpha, -1, 1, -1.57079, 1.57079) for alpha in action]
             # Publish action
@@ -178,7 +152,7 @@ class jcontroller:
         # Load Model
         handler = neuralnetwork.neuralNet()
         rospy.loginfo("Loading model from path: %s"%handler.log_path)
-        handler.load_model(path=handler.log_path)
+        handler.load_model(path=handler.log_path, inputs=4)
         rospy.loginfo("Model loaded...")
         handler.model
         self.nn = handler

@@ -11,7 +11,7 @@ from random import *
     # initiate robot
 j = jcontroller()
     # Start matlab session
-matSess=pymatlab.session_factory()
+matSess = pymatlab.session_factory()
 matSess.run("addpath(genpath('~/catkin_ws/src'))")
 
 def joinLists(a, b, steps = 30):
@@ -40,7 +40,7 @@ def joinLists(a, b, steps = 30):
 def run():
     j.set_joints([0,0,0,0,0,0,0,0,0,0,0,0], mode='deg')
     f = open('Dataset.txt', 'w')
-    for iterations in range(250):
+    for iterations in range(100):
         currentgait = []
         angList = []
         actions = []
@@ -49,9 +49,9 @@ def run():
         # (direction, walkDistance, bh, plot, steps)
         while True:
             if randint(0,1):
-                cmd = "ang = GenerateAngularGait(%d, %f, 0.08, 0, %d)"%(randint(0,1), uniform(0.1, 0.5), randint(60, 350))
+                cmd = "ang = GenerateAngularGait(%d, %f, 0.08, 0, %d)"%(randint(0,1), uniform(0.1, 0.11), randint(60, 150))
             else:
-                cmd =        "ang = GenerateGait(%d, %f, 0.08, 0, %d)"%(randint(0,3), uniform(0.1, 2), randint(60, 350))
+                cmd =        "ang = GenerateGait(%d, %f, 0.08, 0, %d)"%(randint(0,3), uniform(0.1, 0.11), randint(60, 150))
             try:
                 print matSess.run(cmd)
                 print iterations, ": " , cmd

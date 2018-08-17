@@ -56,6 +56,7 @@ def ft_to_array(ft, T, norm=False):
     return array
 
 def array_to_ft(array, norm=False):
+    array = np.array(array)
     T = array[0]
     real = array[1:1+len(array)/2]
     if norm: real[0] = real[0]/10

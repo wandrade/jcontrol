@@ -56,10 +56,10 @@ gait = 1;
 %**************************************************************************
 
 %**************************************************************************
-CT = 0.01; %Cycle Time
-Fc = 0.07; %foot clearance or foot hieght to be lifted
-Hb = 0.09; %hieght of body;
-Ls = 0.14; %step length
+CT = 0.01; % Cycle Time
+Fc = 0.07; % foot clearance or foot hieght to be lifted
+Hb = 0.09; % hieght of body;
+Ls = 0.14; % step length
 sc = 0.15; % Side Clearence 
 %**************************************************************************
 G2BTmat = eye(4);
