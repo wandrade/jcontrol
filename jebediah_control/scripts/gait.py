@@ -43,7 +43,7 @@ def run():
     f = open('Dataset.csv', 'w')
     f.write("x_vel_set,y_vel_set,angular_vel_set,action_0,action_1,action_2,action_3,action_4,action_5,action_6,action_7,action_8,action_9,action_10,action_11\n")
     
-    total_iter = 1000
+    total_iter = 8000
     for iterations in range(total_iter):
         currentgait = []
         angList = []
@@ -53,9 +53,9 @@ def run():
         # (direction, walkDistance, bh, plot, steps)
         while True:
             if randint(0,1):
-                cmd = "ang = GenerateAngularGait(%d, %f, 0.08, 0, %d)"%(randint(0,1), uniform(0.1, 0.11), randint(60, 200))
+                cmd = "ang = GenerateAngularGait(%d, %f, 0.08, 0, %d)"%(randint(0,1), uniform(0.1, 0.11), randint(50, 300))
             else:
-                cmd =        "ang = GenerateGait(%d, %f, 0.08, 0, %d)"%(randint(0,3), uniform(0.1, 0.11), randint(60, 200))
+                cmd =        "ang = GenerateGait(%d, %f, 0.08, 0, %d)"%(randint(0,3), uniform(0.1, 0.11), randint(50, 300))
             try:
                 matSess.run(cmd)
                 # remaining = 
