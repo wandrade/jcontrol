@@ -106,10 +106,7 @@ class jcontroller:
                 for signal in self.angular_ref:
                     action.append(self.eval_period(self.angular_ref[signal], self.T_ang, current_time))
                     
-            self.set_joints(action, mode='deg')
-            # verbose
-            # print error
-            # print action
+            self.set_joints(action)
             
     def get_state(self):
         return self.state
