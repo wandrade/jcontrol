@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 
 import rospy
-from jcontrol_msgs.msg import State, Action
+from jcontrol_msgs.msg import State, Action, SetPoint
 from std_srvs.srv import Empty
 import neuralnetwork
 import time
@@ -47,10 +47,12 @@ def amap(x, in_min, in_max, out_min, out_max):
 
 class jcontroller:
     #             x    y  rot
-    set_point = [0.0, 0.0, 0.1]
+    set_point = [0.0, 0.0, 0.0]
     action_publisher = None
     state = None
     prev_actions = [2]*12
+    coefs = [-2.15245784, 4.86364516, -10.37872853, 5.01919578]
+    
     def __init__(self):
         rospy.init_node('jebediah_controler')
         # Create reset service
@@ -58,6 +60,7 @@ class jcontroller:
         rospy.wait_for_service('gazebo/reset_simulation')
         self.action_publisher = rospy.Publisher("/jebediah/Action", Action, latch=True, queue_size=1)
         rospy.Subscriber("/jebediah/State", State, self.state_callback)
+        rospy.Subscriber("/jebediah/SetPoint", SetPoint, self.setpoint_callback)
         rospy.loginfo("Done..")
         self.control = False
     
@@ -87,7 +90,15 @@ class jcontroller:
             # print T, val, interpolate(val, np.array([s,period]))
             return interpolate(val, np.array([s,period]))
     
-    @timeit
+    # @timeit
+    def setpoint_callback(self, sp):
+        self.set_point[0] = sp.Linear[0]
+        self.set_point[1] = sp.Linear[1]
+        self.set_point[2] = sp.Angular
+        self.T_lin = np.exp(self.coefs[1]) * np.exp(self.coefs[0]*self.set_point[0])
+        self.T_ang = np.exp(self.coefs[3]) * np.exp(self.coefs[2]*self.set_point[2])
+
+
     def state_callback(self, cb_state):
         # get state
         self.state = cb_state
@@ -98,15 +109,17 @@ class jcontroller:
             action = []
             current_time = time.time()
             # Linear in X
-            if self.set_point[0] > self.set_point[2]:
+            if self.set_point[0] == 0.0 and self.set_point[1] == 0.0 and self.set_point[2] == 0.0:
+                 pass
+            elif self.set_point[0] > self.set_point[2]:
                 for signal in self.linear_ref:
                     action.append(self.eval_period(self.linear_ref[signal], self.T_lin, current_time))
+                self.set_joints(action)
             # Angular in Z
             else:
                 for signal in self.angular_ref:
-                    action.append(self.eval_period(self.angular_ref[signal], self.T_ang, current_time))
-                    
-            self.set_joints(action)
+                    action.append(self.eval_period(self.angular_ref[signal], self.T_ang, current_time))    
+                self.set_joints(action)
             
     def get_state(self):
         return self.state
@@ -161,7 +174,6 @@ class jcontroller:
         path = os.path.dirname(os.path.realpath(__file__))
         self.linear_ref = pd.read_csv(path + '/model/reference/forward.csv')
         self.angular_ref = pd.read_csv(path + '/model/reference/rotate.csv')
-        self.coefs = [-2.15245784, 4.86364516, -10.37872853, 5.01919578]
         self.T_lin = np.exp(self.coefs[1]) * np.exp(self.coefs[0]*self.set_point[0])
         self.T_ang = np.exp(self.coefs[3]) * np.exp(self.coefs[2]*self.set_point[2])
         self.control = True
@@ -174,7 +186,7 @@ def main(args):
         time.sleep(1)
         j.reset()
         j.set_control_loop()
-        time.sleep(100)
+        time.sleep(100000)
         #j.set_helloWorld()
         # j.set_joints([40.0, 40.0, 40.0,
         #                 40.0, 40.0, 40.0,

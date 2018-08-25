@@ -54,6 +54,7 @@ add_message_files(
   FILES
   State.msg
   Action.msg
+  SetPoint.msg
 )
 
 ## Generate services in the 'srv' folder
