@@ -7,7 +7,9 @@ import neuralnetwork
 import time
 from math import *
 import numpy as np
-from fourierseries import array_to_ft, eval_rfft
+from fourierseries import interpolate
+import os
+import pandas as pd
 def timeit(method):
     """Time decorator, this can be used to measure the function elapesd time without interfering on its funcionality
     To use it, put the following decorator befor any function:
@@ -44,8 +46,8 @@ def amap(x, in_min, in_max, out_min, out_max):
     return (x - in_min) * (out_max - out_min) / (in_max - in_min) + out_min
 
 class jcontroller:
-    set_point_linear_velocity = [0.08, 1.08]
-    set_point_angular_velocity = 1.08
+    #             x    y  rot
+    set_point = [0.0, 0.0, 0.1]
     action_publisher = None
     state = None
     prev_actions = [2]*12
@@ -66,62 +68,45 @@ class jcontroller:
         except rospy.ServiceException, e:
             rospy.logerr("Service call failed: %s", e)
         rospy.loginfo("Simulation reset")
+
+    def eval_period(self, s, T, time):
+        N = len(s)
+        period = np.linspace(0, T, N)
+        if type(time) is list or type(time) is np.ndarray:
+            vect = []    
+            # make a constant time vector loop trough the limited period vector
+            # generate ocilating time vector
+            for t in time:
+                val = t - int(t/T)*T
+                vect.append(val)
+            # evaluate
+            aprox = interpolate(vect, np.array([s,period]))
+            return aprox
+        else:
+            val = time - int(time/T)*T
+            # print T, val, interpolate(val, np.array([s,period]))
+            return interpolate(val, np.array([s,period]))
     
-    # @timeit
+    @timeit
     def state_callback(self, cb_state):
         # get state
         self.state = cb_state
         if self.control:
             # Calculate error
-            error = np.sqrt((cb_state.Twist.linear.x - self.set_point_linear_velocity[0])**2 + (cb_state.Twist.linear.y - self.set_point_linear_velocity[1])**2 + (cb_state.IMU.angular_velocity.z - self.set_point_angular_velocity)**2)
-            print error
-            # Create eval vector
-            eval_vector = [
-                self.set_point_linear_velocity[0],
-                self.set_point_linear_velocity[1],
-                self.set_point_angular_velocity,
-                error,
-                amap(cb_state.Angles[0], -90, 90, -1, 1),
-                amap(cb_state.Angles[1], -90, 90, -1, 1),
-                amap(cb_state.Angles[2], -90, 90, -1, 1),
-                amap(cb_state.Angles[3], -90, 90, -1, 1),
-                amap(cb_state.Angles[4], -90, 90, -1, 1),
-                amap(cb_state.Angles[5], -90, 90, -1, 1),
-                amap(cb_state.Angles[6], -90, 90, -1, 1),
-                amap(cb_state.Angles[7], -90, 90, -1, 1),
-                amap(cb_state.Angles[8], -90, 90, -1, 1),
-                amap(cb_state.Angles[9], -90, 90, -1, 1),
-                amap(cb_state.Angles[10], -90, 90, -1, 1),
-                amap(cb_state.Angles[11], -90, 90, -1, 1),
-                cb_state.Ground_Collision[0],
-                cb_state.Ground_Collision[1],
-                cb_state.Ground_Collision[2],
-                cb_state.Ground_Collision[3],
-                cb_state.IMU.orientation.x,
-                cb_state.IMU.orientation.y,
-                cb_state.IMU.orientation.z,
-                cb_state.IMU.orientation.w,
-                cb_state.IMU.angular_velocity.x,
-                cb_state.IMU.angular_velocity.y,
-                cb_state.IMU.angular_velocity.z,
-                cb_state.IMU.linear_acceleration.x,
-                cb_state.IMU.linear_acceleration.y,
-                cb_state.IMU.linear_acceleration.z,
-                cb_state.Twist.linear.x,
-                cb_state.Twist.linear.y,
-                cb_state.Twist.linear.z
-            ]
-            eval_vector.extend(self.prev_actions)
-            eval_vector = np.array([eval_vector])
-            # Eval next step
-            fs = self.nn.predict(eval_vector)[0].tolist()
-            fs, T = array_to_ft(fs, norm=True)
-            action = eval_rfft(fs, time.time(), T)
-            print action,type(action)
-            # map from -1 1 to radians
-            # action = [amap(alpha, -1, 1, -1.57079, 1.57079) for alpha in action]
-            # Publish action
-            self.set_joints(action)
+            # error = np.sqrt((cb_state.Twist.linear.x - self.set_point_linear_velocity[0])**2 + (cb_state.Twist.linear.y - self.set_point_linear_velocity[1])**2 + (cb_state.IMU.angular_velocity.z - self.set_point_angular_velocity)**2)
+            # evaluate on setpoint
+            action = []
+            current_time = time.time()
+            # Linear in X
+            if self.set_point[0] > self.set_point[2]:
+                for signal in self.linear_ref:
+                    action.append(self.eval_period(self.linear_ref[signal], self.T_lin, current_time))
+            # Angular in Z
+            else:
+                for signal in self.angular_ref:
+                    action.append(self.eval_period(self.angular_ref[signal], self.T_ang, current_time))
+                    
+            self.set_joints(action, mode='deg')
             # verbose
             # print error
             # print action
@@ -175,13 +160,13 @@ class jcontroller:
                                  30.0,-45.0,45.0], mode='deg')
 
     def set_control_loop(self):
-        # Load Model
-        handler = neuralnetwork.neuralNet()
-        rospy.loginfo("Loading model from path: %s"%handler.log_path)
-        handler.load_model(path=handler.log_path)
-        rospy.loginfo("Model loaded...")
-        handler.model
-        self.nn = handler
+        # Load reference signals
+        path = os.path.dirname(os.path.realpath(__file__))
+        self.linear_ref = pd.read_csv(path + '/model/reference/forward.csv')
+        self.angular_ref = pd.read_csv(path + '/model/reference/rotate.csv')
+        self.coefs = [-2.15245784, 4.86364516, -10.37872853, 5.01919578]
+        self.T_lin = np.exp(self.coefs[1]) * np.exp(self.coefs[0]*self.set_point[0])
+        self.T_ang = np.exp(self.coefs[3]) * np.exp(self.coefs[2]*self.set_point[2])
         self.control = True
 
         

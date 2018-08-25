@@ -41,7 +41,7 @@ def interpolate(t, pairs):
     d_range = d[0]+d[1]
     d = d_range-d
     weights = d/d_range
-    # calculate the avg of those points based on distance
+    # calculate the avg of those points weigthed by distance
     closest = np.average(pairs[0][idx], weights=weights, axis=-1)
     try:
         return closest[0]
