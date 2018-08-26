@@ -1,5 +1,7 @@
 #!/usr/bin/env bash
 sudo apt install python-pip python-dev
+sudo apt install libatlas-base-dev
+sudo easy_install pip
 sudo -H pip install -U pip
 sudo -H pip install -U tensorflow
 sudo -H pip install keras

@@ -1,4 +1,5 @@
 #!/usr/bin/env python
+from __future__ import division
 
 import rospy
 from jcontrol_msgs.msg import State, Action, SetPoint
@@ -59,15 +60,14 @@ class jcontroller:
         # Create reset service
         rospy.Subscriber("/jebediah/State", State, self.state_callback)
         rospy.Subscriber("/jebediah/SetPoint", SetPoint, self.setpoint_callback)
+        self.action_publisher = rospy.Publisher("/jebediah/Action", Action, latch=True, queue_size=1)
         rospy.loginfo("Done..")
         self.control = False
         self.sim = simulation
         if simulation:
             rospy.loginfo("Waiting for gazebo services")
             rospy.wait_for_service('gazebo/reset_simulation')
-            self.action_publisher = rospy.Publisher("/jebediah/Action", Action, latch=True, queue_size=1)
         else:
-            from __future__ import division
             import Adafruit_PCA9685
             self.pwm = Adafruit_PCA9685.PCA9685(address=0x41, busnum=1)# Configure min and max servo pulse lengths
             self.servo_min = 90  # Min pulse length out of 4096
@@ -150,14 +150,21 @@ class jcontroller:
         if len(pList) != 12:
             rospy.logerr("Joints action must be a vector with 12 positions.")
         else:
-            if self.sim: 
-                self.action_publisher.publish(pList)
-            else:
+            self.action_publisher.publish(pList)
+            if not self.sim: 
                 for i in range(16):
-                    val = amap(pList[i], -np.pi, np.pi, self.servo_min, self.servo_max)
-                    pwm.set_pwm(i, i, val)
+                    if pList[i] is not None:
+                        val = amap(pList[i], -np.pi, np.pi, self.servo_min, self.servo_max)
+                        pwm.set_pwm(i, i, val)
+    
     def set_initial(self):
-        self.set_joints([0,0,0,0,0,0,0,0,0,0,0,0])
+        # lift tibia and femur
+        self.set_joints([None, -30, 80, None, -30, 80, None, -30, 80, None, -90, 80])
+        # set coxa
+        self.set_joints([0, None, None, 0, None, None, 0, None, None, 0, None, None])
+        # Set rest
+        self.set_joints([0]*12)
+
 
     def set_helloWorld(self):
         self.set_joints([   0.0,    -45.0,  45.0,
