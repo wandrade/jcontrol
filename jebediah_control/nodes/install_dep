@@ -6,7 +6,7 @@ sudo -H pip install -U pip
 sudo -H pip install -U tensorflow
 sudo -H pip install keras
 sudo -H pip install pandas
-sudo -H pip install -U numpy<=1.14.5
+sudo -H pip install -U numpy==1.14.5
 sudo -H pip install -U matplotlib
 sudo -H pip install memory_profiler
 sudo -H pip install pymatlab
