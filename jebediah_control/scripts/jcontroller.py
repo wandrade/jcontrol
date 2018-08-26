@@ -3,13 +3,14 @@
 import rospy
 from jcontrol_msgs.msg import State, Action, SetPoint
 from std_srvs.srv import Empty
-import neuralnetwork
+# import neuralnetwork
 import time
 from math import *
 import numpy as np
 from fourierseries import interpolate
 import os
 import pandas as pd
+
 def timeit(method):
     """Time decorator, this can be used to measure the function elapesd time without interfering on its funcionality
     To use it, put the following decorator befor any function:
@@ -206,9 +207,10 @@ def main(args):
     try:
         j = jcontroller()
         j.set_initial()
+        j.set_helloWorld()
         time.sleep(1)
-        j.reset()
-        j.set_control_loop()
+        # j.reset()
+        # j.set_control_loop()
         time.sleep(100000)
         #j.set_helloWorld()
         # j.set_joints([40.0, 40.0, 40.0,
