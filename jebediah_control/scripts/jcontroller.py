@@ -53,16 +53,35 @@ class jcontroller:
     prev_actions = [2]*12
     coefs = [-2.15245784, 4.86364516, -10.37872853, 5.01919578]
     
-    def __init__(self):
+    def __init__(self, simulation=False):
         rospy.init_node('jebediah_controler')
         # Create reset service
-        rospy.loginfo("Waiting for gazebo services")
-        rospy.wait_for_service('gazebo/reset_simulation')
-        self.action_publisher = rospy.Publisher("/jebediah/Action", Action, latch=True, queue_size=1)
         rospy.Subscriber("/jebediah/State", State, self.state_callback)
         rospy.Subscriber("/jebediah/SetPoint", SetPoint, self.setpoint_callback)
         rospy.loginfo("Done..")
         self.control = False
+        self.sim = simulation
+        if simulation:
+            rospy.loginfo("Waiting for gazebo services")
+            rospy.wait_for_service('gazebo/reset_simulation')
+            self.action_publisher = rospy.Publisher("/jebediah/Action", Action, latch=True, queue_size=1)
+        else:
+            from __future__ import division
+            import Adafruit_PCA9685
+            self.pwm = Adafruit_PCA9685.PCA9685(address=0x41, busnum=1)# Configure min and max servo pulse lengths
+            self.servo_min = 90  # Min pulse length out of 4096
+            self.servo_max = 490  # Max pulse length out of 4096
+            self.frequencie = 50
+            # Set frequency to 60hz, good for servos.
+            self.pwm.set_pwm_freq(self.frequencie)
+
+    def set_servo_pulse(self, channel, pulse):
+        pulse_length = 1000000    # 1,000,000 us per second
+        pulse_length //= self.frequencie       # 60 Hz
+        pulse_length //= 4096     # 12 bits of resolution
+        pulse *= 1000
+        pulse //= pulse_length
+        self.pwm.set_pwm(channel, 0, pulse)
     
     def reset(self):
         self.resetService = rospy.ServiceProxy('gazebo/reset_simulation', Empty)
@@ -130,8 +149,12 @@ class jcontroller:
         if len(pList) != 12:
             rospy.logerr("Joints action must be a vector with 12 positions.")
         else:
-            self.action_publisher.publish(pList)
-
+            if self.sim: 
+                self.action_publisher.publish(pList)
+            else:
+                for i in range(16):
+                    val = amap(pList[i], -np.pi, np.pi, self.servo_min, self.servo_max)
+                    pwm.set_pwm(i, i, val)
     def set_initial(self):
         self.set_joints([0,0,0,0,0,0,0,0,0,0,0,0])
 

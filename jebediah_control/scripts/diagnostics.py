@@ -6,10 +6,7 @@ import numpy as np
 import time
 import signal
 import sys
-
 from jcontrol_msgs.msg import State, Action, SetPoint
-
-
 
 buffer_size = 1500
 topic_p = 0.02
