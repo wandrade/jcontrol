@@ -1,0 +1,3 @@
+<launch>
+    <node name="jcontroller.py" pkg="jebediah_control" type="jcontroller.py" respawn="true" output="screen"></node>
+</launch>
