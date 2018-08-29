@@ -69,12 +69,15 @@ class jcontroller:
             rospy.wait_for_service('gazebo/reset_simulation')
         else:
             import Adafruit_PCA9685
-            self.pwm = Adafruit_PCA9685.PCA9685(address=0x41, busnum=1)# Configure min and max servo pulse lengths
+            self.pwm = Adafruit_PCA9685.PCA9685(address=0x40, busnum=1)# Configure min and max servo pulse lengths
             self.servo_min = 90  # Min pulse length out of 4096
             self.servo_max = 490  # Max pulse length out of 4096
             self.frequencie = 50
             # Set frequency to 60hz, good for servos.
             self.pwm.set_pwm_freq(self.frequencie)
+            # release motors
+            for i in range(16):
+                self.pwm.set_pwm(i, 0, 0)
 
     def set_servo_pulse(self, channel, pulse):
         pulse_length = 1000000    # 1,000,000 us per second
@@ -118,8 +121,9 @@ class jcontroller:
         self.T_lin = np.exp(self.coefs[1]) * np.exp(self.coefs[0]*self.set_point[0])
         self.T_ang = np.exp(self.coefs[3]) * np.exp(self.coefs[2]*self.set_point[2])
 
-
+    # @timeit
     def state_callback(self, cb_state):
+        tibia_correction = np.pi/2
         # get state
         self.state = cb_state
         if self.control:
@@ -130,16 +134,23 @@ class jcontroller:
             current_time = time.time()
             # Linear in X
             if self.set_point[0] == 0.0 and self.set_point[1] == 0.0 and self.set_point[2] == 0.0:
-                 pass
+                 action = [None]*12
             elif self.set_point[0] > self.set_point[2]:
                 for signal in self.linear_ref:
                     action.append(self.eval_period(self.linear_ref[signal], self.T_lin, current_time))
-                self.set_joints(action)
+                action[2] = action[2] + tibia_correction
+                action[5] = action[5] + tibia_correction
+                action[8] = action[8] + tibia_correction
+                action[11] = action[11] + tibia_correction
             # Angular in Z
             else:
                 for signal in self.angular_ref:
-                    action.append(self.eval_period(self.angular_ref[signal], self.T_ang, current_time))    
-                self.set_joints(action)
+                    action.append(self.eval_period(self.angular_ref[signal], self.T_ang, current_time))
+                action[2] = action[2] + tibia_correction
+                action[5] = action[5] + tibia_correction
+                action[8] = action[8] + tibia_correction
+                action[11] = action[11] + tibia_correction
+            self.set_joints(action)
             
     def get_state(self):
         return self.state
@@ -152,18 +163,20 @@ class jcontroller:
         else:
             self.action_publisher.publish(pList)
             if not self.sim: 
-                for i in range(16):
+                for i in range(12):
                     if pList[i] is not None:
-                        val = amap(pList[i], -np.pi, np.pi, self.servo_min, self.servo_max)
-                        pwm.set_pwm(i, i, val)
+                        val = int(amap(pList[i], -np.pi, np.pi, self.servo_min, self.servo_max))
+                        self.pwm.set_pwm(i, 0, val)
     
     def set_initial(self):
-        # lift tibia and femur
-        self.set_joints([None, -30, 80, None, -30, 80, None, -30, 80, None, -90, 80])
-        # set coxa
-        self.set_joints([0, None, None, 0, None, None, 0, None, None, 0, None, None])
-        # Set rest
-        self.set_joints([0]*12)
+        # Coxa
+        self.set_joints([0, None,None,0,None,None,0,None,None,0,None,None])
+        time.sleep(0.2)
+        # lift tibia
+        self.set_joints([None,None,0,None,None,0,None,None,0,None,0,None])
+        time.sleep(0.2)
+        # set femur
+        self.set_joints([0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0])
 
 
     def set_helloWorld(self):
@@ -208,17 +221,18 @@ class jcontroller:
         self.T_lin = np.exp(self.coefs[1]) * np.exp(self.coefs[0]*self.set_point[0])
         self.T_ang = np.exp(self.coefs[3]) * np.exp(self.coefs[2]*self.set_point[2])
         self.control = True
+        print 'Control loop set'
 
         
 def main(args):
     try:
         j = jcontroller()
         j.set_initial()
-        j.set_helloWorld()
-        time.sleep(1)
+        # j.set_helloWorld()
+        # time.sleep(1)
         # j.reset()
-        # j.set_control_loop()
-        time.sleep(100000)
+        j.set_control_loop()
+        time.sleep(1000000)
         #j.set_helloWorld()
         # j.set_joints([40.0, 40.0, 40.0,
         #                 40.0, 40.0, 40.0,
