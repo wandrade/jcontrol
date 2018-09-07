@@ -115,6 +115,7 @@ class jcontroller:
     
     # @timeit
     def setpoint_callback(self, sp):
+        print "sp changed"
         self.set_point[0] = sp.Linear[0]
         self.set_point[1] = sp.Linear[1]
         self.set_point[2] = sp.Angular
@@ -156,62 +157,69 @@ class jcontroller:
         return self.state
 
     def set_joints(self, pList, mode='rad'):
-        if 'deg' in mode:
-            pList = [radians(p) for p in pList]
         if len(pList) != 12:
             rospy.logerr("Joints action must be a vector with 12 positions.")
-        else:
-            self.action_publisher.publish(pList)
-            if not self.sim: 
-                for i in range(12):
-                    if pList[i] is not None:
+            return None
+
+        if 'deg' in mode:
+            pList = [radians(p) if p is not None else None for p in pList]
+        
+        self.action_publisher.publish(pList)
+        if not self.sim: 
+            for i in range(12):
+                if pList[i] is not None:
+                    if i == 1 or i == 4 or i == 7 or i == 10:
                         val = int(amap(pList[i], -np.pi, np.pi, self.servo_min, self.servo_max))
-                        self.pwm.set_pwm(i, 0, val)
+                    else:
+                        val = int(amap(pList[i], -np.pi, np.pi, self.servo_max, self.servo_min))
+                    self.pwm.set_pwm(i, 0, val)
     
     def set_initial(self):
         # Coxa
         self.set_joints([0, None,None,0,None,None,0,None,None,0,None,None])
-        time.sleep(0.2)
-        # lift tibia
-        self.set_joints([None,None,0,None,None,0,None,None,0,None,0,None])
-        time.sleep(0.2)
+        time.sleep(0.5)
         # set femur
         self.set_joints([0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0])
 
 
     def set_helloWorld(self):
-        self.set_joints([   0.0,    -45.0,  45.0,
+        st = 0.005/3
+        # Initial position
+        self.set_joints([   0.0,    -80.0,  45.0,
                           -30.0,    -45.0,  45.0,
-                            0.0,    -45.0,  45.0,
+                            0.0,     15.0,  45.0,
                            30.0,    -45.0,  45.0], mode='deg')
-        time.sleep(0.05)
-        for i in range(-45, 80):
-            time.sleep(0.005)
-            self.set_joints([   0.0, i, 45.0,
-                              -30.0,-45.0,45.0,
-                                0.0,-45.0,45.0,
-                               30.0,-45.0,45.0], mode='deg')
         time.sleep(0.5)
-        for i in range(0, 30):
-            time.sleep(0.005)
-            self.set_joints([   i, 80.0,45.0,
-                            -30.0,-45.0,45.0,
-                              0.0,-45.0,45.0,
-                             30.0,-45.0,45.0], mode='deg')
+        # Lift first leg femur
+        for i in range(-45, 80):
+            j = amap(i, -45, 80, 0, 80) #45
+            self.set_joints([   None,    i, j,
+                                None, None, None,
+                                None, None, None,
+                                None, None, None], mode='deg')
+            time.sleep(st)
+        # Position coxa on 0
+        for i in range(0, 30):# 30
+            self.set_joints([      i, None, None,
+                                None, None, None,
+                                None, None, None,
+                                None, None, None], mode='deg')
+            time.sleep(st)
         # wave
-        for k in range(0, 5):
-            for i in range(30, -30):
-                time.sleep(0.005)
-                self.set_joints([   i, 80.0,45.0,
-                                -30.0,-45.0,45.0,
-                                  0.0,-45.0,45.0,
-                                 30.0,-45.0,45.0], mode='deg')
+        for k in range(3):
+            for i in reversed(range(-30, 30)):
+                self.set_joints([      i, None, None,
+                                    None, None, None,
+                                    None, None, None,
+                                    None, None, None], mode='deg')
+                time.sleep(st)
+
             for i in range(-30, 30):
-                time.sleep(0.005)
-                self.set_joints([   i, 80.0,45.0,
-                                -30.0,-45.0,45.0,
-                                  0.0,-45.0,45.0,
-                                 30.0,-45.0,45.0], mode='deg')
+                self.set_joints([      i, None, None,
+                                    None, None, None,
+                                    None, None, None,
+                                    None, None, None], mode='deg')
+                time.sleep(st)
 
     def set_control_loop(self):
         # Load reference signals
@@ -228,16 +236,18 @@ def main(args):
     try:
         j = jcontroller()
         j.set_initial()
-        # j.set_helloWorld()
-        # time.sleep(1)
-        # j.reset()
-        j.set_control_loop()
-        time.sleep(1000000)
-        #j.set_helloWorld()
+        time.sleep(3)
+        j.set_helloWorld()
         # j.set_joints([40.0, 40.0, 40.0,
         #                 40.0, 40.0, 40.0,
         #                 40.0, 40.0, 40.0,
         #                 40.0, 40.0, 40.0], mode='deg')
+        time.sleep(1)
+        j.set_initial()
+        # j.reset()
+        j.set_control_loop()
+        time.sleep(3000)
+        #j.set_helloWorld()
         # while not rospy.is_shutdown():
         #     time.sleep(1)
         #     rospy.loginfo(j.get_state())
