@@ -40,7 +40,7 @@ def joinLists(a, b, steps = 30):
 def run():
     j.set_joints([0,0,0,0,0,0,0,0,0,0,0,0], mode='deg')
     f = open('Dataset.txt', 'w')
-    for iterations in range(250):
+    for iterations in range(4):
         currentgait = []
         angList = []
         actions = []
@@ -48,6 +48,8 @@ def run():
         # Generate path
         # (direction, walkDistance, bh, plot, steps)
         while True:
+
+            print 'Trying'
             if randint(0,1):
                 cmd = "ang = GenerateAngularGait(%d, %f, 0.13, 0, %d)"%(0, uniform(0.1, 0.5), randint(200, 350))
             else:
@@ -113,6 +115,7 @@ def run():
             # Action
             line = line + "%f %f %f %f %f %f %f %f %f %f %f %f"%(actions[i][0], actions[i][1], actions[i][2], actions[i][3], actions[i][4], actions[i][5], actions[i][6], actions[i][7], actions[i][8], actions[i][9], actions[i][10], actions[i][11])
             ### WRITE
+            print line
             f.write('%s\n' % line)
         print xVel, yVel, aVel;
         

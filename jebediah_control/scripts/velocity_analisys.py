@@ -25,8 +25,9 @@ def eval_period(s, T, time):
 
 
 path = os.path.dirname(os.path.realpath(__file__))
-full_steps = pd.read_csv(path + "/model/Datasets/Dataset_evo.txt", sep=" ")
-processed_steps = pd.read_csv(path + "/model/Datasets/Dataset_processed.csv")
+print path + "/model/Datasets/Dataset_example.txt"
+full_steps = pd.read_csv(path + "/model/Datasets/Dataset_ref.txt", sep=" ")
+# processed_steps = pd.read_csv(path + "/model/Datasets/Dataset_processed.csv")
 
 
 # Reference path
@@ -45,7 +46,7 @@ linear_steps.plot(grid=True, title="Linear loop")
 linear_steps.to_csv(path + "/model/reference/forward.csv", index=False)
 
 # do the same for angular movement
-angular_steps = df_list[6]
+angular_steps = df_list[2]
 angular_steps.drop(angular_steps.columns[0:32], axis=1, inplace=True)
 angular_steps.reset_index(inplace=True)
 n = angular_steps.shape[0]
