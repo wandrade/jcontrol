@@ -49,7 +49,7 @@ def amap(x, in_min, in_max, out_min, out_max):
 
 class jcontroller:
     #             x    y  rot
-    set_point = [0.0, 0.0, 0.0]
+    set_point = [1.5, 0.0, 0.0]
     action_publisher = None
     state = None
     prev_actions = [2]*12
@@ -78,7 +78,23 @@ class jcontroller:
             # release motors
             for i in range(16):
                 self.pwm.set_pwm(i, 0, 0)
-
+            # Calculate second order coeficients for calibration:
+            calibration = [[460, 305, 100],
+            [125,270,435],
+            [420,270,100],
+            [440,275,130],
+            [92,250,430],
+            [465,270,95],
+            [440,290,145],
+            [110,240,410],
+            [470,270,93],
+            [430,260,100],
+            [85,240,445],
+            [420,260,110]]
+            self.cal = []
+            for c in calibration:
+                self.cal.append(np.polyfit([-np.pi/2, 0, np.pi/2], c, 2))
+            # print self.cal
     def set_servo_pulse(self, channel, pulse):
         pulse_length = 1000000    # 1,000,000 us per second
         pulse_length //= self.frequencie       # 60 Hz
@@ -124,7 +140,6 @@ class jcontroller:
 
     # @timeit
     def state_callback(self, cb_state):
-        tibia_correction = np.pi/2
         # get state
         self.state = cb_state
         if self.control:
@@ -137,20 +152,20 @@ class jcontroller:
             if self.set_point[0] == 0.0 and self.set_point[1] == 0.0 and self.set_point[2] == 0.0:
                  action = [None]*12
             elif self.set_point[0] > self.set_point[2]:
-                for signal in self.linear_ref:
+                
+                for i, signal in enumerate(self.linear_ref):
                     action.append(self.eval_period(self.linear_ref[signal], self.T_lin, current_time))
-                action[2] = action[2] + tibia_correction
-                action[5] = action[5] + tibia_correction
-                action[8] = action[8] + tibia_correction
-                action[11] = action[11] + tibia_correction
+                    if i == 1 or i == 4 or i == 7 or i == 10:
+                        action[-1] = action[-1] - 1.5*0.174
+                    elif i == 2 or i == 5 or i == 8 or i == 11:
+                        action[-1] = action[-1] + 1.5*0.174
+                    else:
+                        action[-1] = action[-1]*1.1
             # Angular in Z
             else:
                 for signal in self.angular_ref:
                     action.append(self.eval_period(self.angular_ref[signal], self.T_ang, current_time))
-                action[2] = action[2] + tibia_correction
-                action[5] = action[5] + tibia_correction
-                action[8] = action[8] + tibia_correction
-                action[11] = action[11] + tibia_correction
+            # print action
             self.set_joints(action)
             
     def get_state(self):
@@ -168,38 +183,69 @@ class jcontroller:
         if not self.sim: 
             for i in range(12):
                 if pList[i] is not None:
-                    if i == 1 or i == 4 or i == 7 or i == 10:
-                        val = int(amap(pList[i], -np.pi, np.pi, self.servo_min, self.servo_max))
-                    else:
-                        val = int(amap(pList[i], -np.pi, np.pi, self.servo_max, self.servo_min))
+                    # if i == 1 or i == 4 or i == 7 or i == 10:
+                    #     int(amap(pList[i], -np.pi, np.pi, self.servo_max, self.servo_min))
+                    # else:
+                    val = int(np.polyval(self.cal[i], pList[i]))
                     self.pwm.set_pwm(i, 0, val)
     
     def set_initial(self):
         # Coxa
         self.set_joints([0, None,None,0,None,None,0,None,None,0,None,None])
+        time.sleep(0.2)
+        self.set_joints([0, 75, None, 0, 75, 0, None, 75, None, 0, 75, None], mode='deg')
+        time.sleep(0.2)
+        self.set_joints([0, 75,-45, 0, 75,-45, 0, 75,-45, 0, 75,-45], mode='deg')
         time.sleep(0.5)
         # set femur
-        self.set_joints([0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0])
+        self.set_joints([0, 0, -45, 0, 0, -45, 0, 0, -45, 0, 0, -45], mode='deg')
+        time.sleep(0.15)
+        self.set_joints([0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], mode='deg')
+        time.sleep(0.15)
+        self.set_joints([0, -20, 0, 0, -20, 0, 0, -20, 0, 0, -20, 0], mode='deg')
+        time.sleep(0.8)
+        for i in range(5):
+            for j in range(4):
+                zeros = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+                # Lift femur 
+                zeros[1+3*j] = -3*0.174
+                # zeros[2+3*j] = -2*0.174
+                self.set_joints(zeros)
+                time.sleep(0.05)
+                # low femur
+                self.set_joints([0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0])
+                time.sleep(0.05)
+            
 
 
     def set_helloWorld(self):
-        st = 0.005/3
+        st = 0.0001
         # Initial position
-        self.set_joints([   0.0,    -80.0,  45.0,
-                          -30.0,    -45.0,  45.0,
-                            0.0,     15.0,  45.0,
-                           30.0,    -45.0,  45.0], mode='deg')
-        time.sleep(0.5)
+        self.set_joints([   0.0,    -30.0,  20.0,
+                          -40.0,      0.0,  0.0,
+                            0.0,      0.0,  0.0,
+                           40.0,      0.0,  0.0], mode='deg')
+        time.sleep(0.2)
+        self.set_joints([   0.0,      30.0,  -20,
+                          -40.0,      0.0,  0.0,
+                            0.0,      0.0,  0.0,
+                           40.0,      0.0,  0.0], mode='deg')
+        time.sleep(0.2)
+        self.set_joints([   0.0,      30.0,  -20,
+                          -40.0,      -20.0,  10.0,
+                            0.0,      20.0,  0.0,
+                           40.0,      -20.0,  10.0], mode='deg')
+        time.sleep(0.2)
         # Lift first leg femur
-        for i in range(-45, 80):
-            j = amap(i, -45, 80, 0, 80) #45
+        for i in range(30, 80):
+            j = amap(i, 30, 80, -20, 60)
             self.set_joints([   None,    i, j,
                                 None, None, None,
                                 None, None, None,
                                 None, None, None], mode='deg')
             time.sleep(st)
         # Position coxa on 0
-        for i in range(0, 30):# 30
+        for i in range(0, 30):
             self.set_joints([      i, None, None,
                                 None, None, None,
                                 None, None, None,
@@ -220,6 +266,22 @@ class jcontroller:
                                     None, None, None,
                                     None, None, None], mode='deg')
                 time.sleep(st)
+        time.sleep(0.3)
+        self.set_joints([      0,   30,    0,
+                            None, None, None,
+                            None, None, None,
+                            None, None, None], mode='deg')
+        time.sleep(0.2)
+        self.set_joints([      0,   0,    0,
+                               0, None, None,
+                               0, None, None,
+                               0, None, None], mode='deg')
+        time.sleep(0.15)
+        self.set_joints([      0, 0, 0,
+                               0, 0, 0,
+                               0, 0, 0,
+                               0, 0, 0], mode='deg')
+        time.sleep(0.2)
 
     def set_control_loop(self):
         # Load reference signals
@@ -228,6 +290,15 @@ class jcontroller:
         self.angular_ref = pd.read_csv(path + '/model/reference/rotate.csv')
         self.T_lin = np.exp(self.coefs[1]) * np.exp(self.coefs[0]*self.set_point[0])
         self.T_ang = np.exp(self.coefs[3]) * np.exp(self.coefs[2]*self.set_point[2])
+        # prepare positions
+        for i in range (0, 40):
+            j = amap(i, 0, 40, 0, -34)
+            self.set_joints([   None, i, j,
+                                None, i, j,
+                                None, i, j,
+                                None, i, j,
+            ], mode='deg')
+            time.sleep(0.01)
         self.control = True
         print 'Control loop set'
 
@@ -242,8 +313,8 @@ def main(args):
         #                 40.0, 40.0, 40.0,
         #                 40.0, 40.0, 40.0,
         #                 40.0, 40.0, 40.0], mode='deg')
-        time.sleep(1)
-        j.set_initial()
+        time.sleep(3)
+        # j.set_initial()
         # j.reset()
         j.set_control_loop()
         time.sleep(3000)
