@@ -9,7 +9,7 @@ from random import *
 
 #def main():
     # initiate robot
-j = jcontroller()
+j = jcontroller(simulation=True)
     # Start matlab session
 matSess=pymatlab.session_factory()
 matSess.run("addpath(genpath('~/catkin_ws/src'))")
@@ -39,8 +39,8 @@ def joinLists(a, b, steps = 30):
 
 def run():
     j.set_joints([0,0,0,0,0,0,0,0,0,0,0,0], mode='deg')
-    f = open('Dataset.txt', 'w')
-    for iterations in range(250):
+    f = open('Dataset_example.txt', 'w')
+    for iterations in range(4):
         currentgait = []
         angList = []
         actions = []
@@ -49,9 +49,9 @@ def run():
         # (direction, walkDistance, bh, plot, steps)
         while True:
             if randint(0,1):
-                cmd = "ang = GenerateAngularGait(%d, %f, 0.08, 0, %d)"%(randint(0,1), uniform(0.1, 0.5), randint(60, 350))
+                cmd = "ang = GenerateAngularGait(%d, %f, 0.13, 0, %d)"%(0, 0.1, 350)
             else:
-                cmd =        "ang = GenerateGait(%d, %f, 0.08, 0, %d)"%(randint(0,3), uniform(0.1, 2), randint(60, 350))
+                cmd =        "ang = GenerateGait(%d, %f, 0.13, 0, %d)"%(0, 0.1, 350)
             try:
                 print matSess.run(cmd)
                 print iterations, ": " , cmd
@@ -83,7 +83,7 @@ def run():
             # set action
             j.set_joints(step, mode='deg')
             # wait period
-            time.sleep(0.02)
+            time.sleep(0.05)
         # calculate velocity
         xVel = round(np.mean([s.Twist.linear.x for s in states][31:-1]),3)
         yVel = round(np.mean([s.Twist.linear.y for s in states][31:-1]),3)
