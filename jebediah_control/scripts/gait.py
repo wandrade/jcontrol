@@ -39,8 +39,8 @@ def joinLists(a, b, steps = 30):
 
 def run():
     j.set_joints([0,0,0,0,0,0,0,0,0,0,0,0], mode='deg')
-    f = open('Dataset_example.txt', 'w')
-    for iterations in range(4):
+    f = open('Dataset.txt', 'w')
+    for iterations in range(250):
         currentgait = []
         angList = []
         actions = []
@@ -49,9 +49,9 @@ def run():
         # (direction, walkDistance, bh, plot, steps)
         while True:
             if randint(0,1):
-                cmd = "ang = GenerateAngularGait(%d, %f, 0.13, 0, %d)"%(0, 0.1, 350)
+                cmd = "ang = GenerateAngularGait(%d, %f, 0.13, 0, %d)"%(0, uniform(0.1, 0.5), randint(200, 350))
             else:
-                cmd =        "ang = GenerateGait(%d, %f, 0.13, 0, %d)"%(0, 0.1, 350)
+                cmd =        "ang = GenerateGait(%d, %f, 0.13, 0, %d)"%(0, uniform(0.1, 0.2), randint(200, 350))
             try:
                 print matSess.run(cmd)
                 print iterations, ": " , cmd
